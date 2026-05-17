@@ -46,14 +46,9 @@ struct Data {
         : Base{std::forward<OO>(oo)...}
         , data{std::forward<V>(value)} {}
 
-    // ~~Fallback for Chain construction (no initial value)~~
-    // all components on a runtime data environment should be `using Base::Base`
-    // and if the requires construction by them selves, they should provide
-    // a constructor that takes it plus com extra ... to pass along for Base
-    // TODO: this should be stated on the HAPI component anatomy section
-    // template <typename... OO>
-    // constexpr Part(OO &&...oo)
-    //     : Base{std::forward<OO>(oo)...} {}
+    template <typename... OO>
+    constexpr Part(OO &&...oo)
+        : Base{std::forward<OO>(oo)...} {}
 
     const Type &get() const { return data; }
 
