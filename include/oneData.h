@@ -37,6 +37,7 @@ struct Data {
   struct Part : O {
     using Base = O;
     using Type = T;
+    using NRP=std::decay_t<Type>;
 
     Type data{};
 
@@ -52,7 +53,7 @@ struct Data {
 
     const Type &get() const { return data; }
 
-    void set(std::decay_t<Type> v) { data = v; }//forward?
+    void set(NRP v) { data = v; }//forward?
     
     operator Type &() { return data; }
     operator const Type &() const { return data; }
@@ -119,6 +120,7 @@ struct NumRange {
   struct Part : O {
     using Base = O;
     using Type = N;
+    using NRP = std::decay_t<Type>;
 
     using Base::get;
     using Base::set;
@@ -127,14 +129,14 @@ struct NumRange {
     bool wraps;
 
     template <typename... OO>
-    constexpr Part(Type low, Type high, bool w, OO &&...oo)
+    constexpr Part(NRP low, NRP high, bool w, OO &&...oo)
         : Base{std::forward<OO>(oo)...}, m_low{low}, m_high{high}, wraps{w} {}
 
-    constexpr bool valid(Type v) const { return v >= m_low && v <= m_high; }
-    constexpr Type clamp(Type v) const { return v < m_low ? m_low : v > m_high ? m_high : v; }
+    constexpr bool valid(NRP v) const { return v >= m_low && v <= m_high; }
+    constexpr Type clamp(NRP v) const { return v < m_low ? m_low : v > m_high ? m_high : v; }
 
-    void up(Type step = 1) { set(clamp(get() + step)); }
-    void down(Type step = 1) { set(clamp(get() - step)); }
+    void up(NRP step = 1) { set(clamp(get() + step)); }
+    void down(NRP step = 1) { set(clamp(get() - step)); }
   };
 };
 
