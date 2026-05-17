@@ -1,0 +1,26 @@
+{
+  "name": "OneData",
+  "version": "0.1.0",
+  "description": "HAPI data components",
+  "keywords": "components, data",
+  "repository":
+  {
+    "type": "git",
+    "url": "https://github.com/InternetOfPins/OneData.git"
+  },
+  "authors":
+  [
+    {
+      "name": "Rui Azevedo",
+      "email": "ruihfazevedo@gmail.com",
+      "url": "https://github.com/neu-rah",
+      "maintainer": true
+    }
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/InternetOfPins/OneData",
+  "dependencies": {
+  },
+  "frameworks": "*",
+  "platforms": "*"
+}
