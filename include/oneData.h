@@ -53,7 +53,7 @@ struct Data {
 
     const Type &get() const { return data; }
 
-    void set(NRP v) { data = v; }//forward?
+    void set(const NRP v) { data = v; }
     
     operator Type &() { return data; }
     operator const Type &() const { return data; }
@@ -125,7 +125,7 @@ struct NumRange {
     using Base::get;
     using Base::set;
 
-    Type m_low, m_high;
+    NRP m_low, m_high;
     bool wraps;
 
     template <typename... OO>
@@ -133,7 +133,7 @@ struct NumRange {
         : Base{std::forward<OO>(oo)...}, m_low{low}, m_high{high}, wraps{w} {}
 
     constexpr bool valid(NRP v) const { return v >= m_low && v <= m_high; }
-    constexpr Type clamp(NRP v) const { return v < m_low ? m_low : v > m_high ? m_high : v; }
+    constexpr NRP clamp(NRP v) const { return v < m_low ? m_low : v > m_high ? m_high : v; }
 
     void up(NRP step = 1) { set(clamp(get() + step)); }
     void down(NRP step = 1) { set(clamp(get() - step)); }
