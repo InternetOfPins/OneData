@@ -30,18 +30,16 @@ struct DataDef : APIOf<DataAPI<>, OO...> {
   using Base::Base;
 };
 
-// ====================== Runtime Data (Value + Reference support) ======================
+// ====================== Owned Data ======================
 template <typename T>
 struct Data {
   template <typename O>
   struct Part : O {
     using Base = O;
     using Type = T;
-    using NRP=std::decay_t<Type>;
 
     Type data{};
 
-    // Perfect forwarding constructor (handles T and T&)
     template <typename V, typename... OO>
     constexpr Part(V&& value, OO &&...oo)
         : Base{std::forward<OO>(oo)...}
@@ -51,20 +49,13 @@ struct Data {
     constexpr Part(OO &&...oo)
         : Base{std::forward<OO>(oo)...} {}
 
-    const Type &get() const { return data; }
+    const Type& get() const { return data; }
 
-    void set(const NRP v) { data = v; }
-    
-    operator Type &() { return data; }
-    operator const Type &() const { return data; }
+    template <typename V>
+    void set(V&& v) {data = std::forward<V>(v);}
 
-    template <typename Out, typename Ctx>
-    void print(Out &out, Ctx &ctx) {
-      out.template fmtStart<Fmt::Data>(ctx);
-      out.put(data);
-      out.template fmtStop<Fmt::Data>(ctx);
-      Base::print(out, ctx);
-    }
+    operator Type&()             { return data; }
+    operator const Type&() const { return data; }
   };
 };
 
