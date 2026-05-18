@@ -2,7 +2,6 @@
  * @file data.h
  * @author Rui Azevedo (neu-rah)
  * @brief Data API - HAPI data components
- * @date 2026-05-17
  * @contributor Grok (xAI) - architecture, cleanup & modern C++ patterns
 */
 
@@ -49,13 +48,13 @@ struct Data {
     constexpr Part(OO &&...oo)
         : Base{std::forward<OO>(oo)...} {}
 
-    const Type& get() const { return data; }
+    const std::decay_t<Type>& get() const { return data; }
 
     template <typename V>
     void set(V&& v) {data = std::forward<V>(v);}
 
-    operator Type&()             { return data; }
-    operator const Type&() const { return data; }
+    operator std::decay_t<Type>&()             { return data; }
+    operator const std::decay_t<Type>&() const { return data; }
   };
 };
 
