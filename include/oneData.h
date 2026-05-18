@@ -135,8 +135,12 @@ struct NumRange {
     constexpr bool valid(NRP v) const { return v >= m_low && v <= m_high; }
     constexpr NRP clamp(NRP v) const { return v < m_low ? m_low : v > m_high ? m_high : v; }
 
-    void up(NRP step = 1) { set(clamp(get() + step)); }
-    void down(NRP step = 1) { set(clamp(get() - step)); }
+    constexpr NRP stepUp(NRP o,NRP s) {return m_high-o>=s?o+s:wraps?m_low:m_high;}
+    constexpr NRP stepDown(NRP s,NRP o) {return o-m_low>=s?o-s:wraps?m_high:m_low;}
+
+    void up(NRP s=1) {get()=stepUp(s,get());}
+    void down(NRP s=1) {get()=stepDown(s,get());}
+
   };
 };
 
