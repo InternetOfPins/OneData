@@ -11,11 +11,14 @@
 #include <type_traits>
 #include <utility>
 
-namespace hapi { namespace data {
+#include <hapi/hapi.h>
+using hapi::APIOf;
+
+namespace oneData {
   using CText = const char *;
 
   // ====================== Base ======================
-  template <typename O = Nil>
+  template <typename O = hapi::Nil>
   struct DataAPI : O {
     using Base = O;
     using Base::Base;
@@ -31,7 +34,20 @@ namespace hapi { namespace data {
   };
 
   // use alias or customize the DataDef
-  // template <typename... OO> using DataDef = DefaultDataDef<OO...>;
+  template <typename... OO> using DataDef = DefaultDataDef<OO...>;
+
+  // ====================== Static Data ======================
+  template<typename T,T data>
+  struct StaticData {
+    template<typename O>
+    struct Part:O {
+      using Base=O;
+      using Base::Base;
+      using Type=decltype(data);
+      static constexpr const Type& get() {return data;}
+      constexpr void set(std::decay_t<Type> o){data=std::move(o);}
+    };
+  };
 
   // ====================== Owned Data ======================
   template <typename T>
@@ -173,4 +189,4 @@ namespace hapi { namespace data {
   using Int  = Data<int>;
 
   template <const CText &text> using StaticText=TextRef<text>;
-}};//namespace hapi::data
+};//namespace hapi::data
