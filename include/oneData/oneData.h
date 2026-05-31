@@ -7,7 +7,6 @@
 
 #pragma once
 
-// #include "menu/sys/base.h"
 #include <type_traits>
 #include <utility>
 
@@ -189,4 +188,4 @@ namespace oneData {
   using Int  = Data<int>;
 
   template <const CText &text> using StaticText=TextRef<text>;
-};//namespace hapi::data
+};//namespace oneData
