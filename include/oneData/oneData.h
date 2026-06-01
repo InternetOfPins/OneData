@@ -24,6 +24,7 @@ namespace oneData {
 
     static constexpr bool changed() { return false; }
     static constexpr void sync() {}
+    template<typename Out> void print(Out& out) const {}
   };
 
   template <typename... OO>
@@ -45,8 +46,13 @@ namespace oneData {
       using Type=decltype(data);
       static constexpr const Type& get() {return data;}
       constexpr void set(std::decay_t<Type> o){data=std::move(o);}
+      template<typename Out> void print(Out& out) const {out.put(data);Base::print(out);}
     };
   };
+
+  template<int o> using StaticInt=StaticData<int,o>;
+  template<bool o> using StaticBool=StaticData<bool,o>;
+  template<char o> using StaticChar=StaticData<char,o>;
 
   // ====================== Owned Data ======================
   template <typename T>
@@ -74,6 +80,7 @@ namespace oneData {
 
       operator std::decay_t<Type>&()             { return data; }
       operator const std::decay_t<Type>&() const { return data; }
+      template<typename Out> void print(Out& out) const {out.put(get());Base::print(out);}
     };
   };
 
@@ -90,6 +97,7 @@ namespace oneData {
 
       operator Type &() { return get(); }
       operator const Type &() const { return get(); }
+      template<typename Out> void print(Out& out) const {out.put(get());Base::print(out);}
     };
   };
 
