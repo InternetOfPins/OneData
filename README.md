@@ -22,15 +22,16 @@ Provides owned values, references, ranges, defaults and change tracking with zer
 
 ```cpp
 #include "oneData.h"
+using namespace oneData;
 
-using namespace hapi::data;
+int value = 42;
 
 Text label = "Status";
-Int  value = 42;
-
-auto volume = MenuData<int>{75};        // menu-extended version
+auto volume = DataDef<Watch,Int&>{value};//will detect changes (watch) on external var
+auto power = DataDef<Watch,Int>{60};//own data, watch for changes
 
 if (volume.changed()) {
     // ...
+    volume.sync();//clear changed, prepare for next change
 }
 ```

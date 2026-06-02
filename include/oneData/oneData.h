@@ -61,6 +61,7 @@ namespace oneData {
     struct Part : O {
       using Base = O;
       using Type = T;
+      using Base::Base;
 
       Type data{};
 
@@ -128,6 +129,7 @@ namespace oneData {
     template <typename O>
     struct Part : O {
       using Base = O;
+      using Base::Base;
       using Type = N;
       using NRP = std::decay_t<Type>;
 
