@@ -31,9 +31,7 @@ using hapi::APIOf;
 namespace oneData {
   using CText = const char *;
 
-  // ==========================================================================
-  // BASE DATA API
-  // ==========================================================================
+  // BASE DATA API --
   template <typename O = hapi::Nil>
   struct DataAPI : O {
     using Base = O;
@@ -52,9 +50,7 @@ namespace oneData {
 
   template <typename... OO> using DataDef = DefaultDataDef<OO...>;
 
-  // ==========================================================================
-  // STATIC DATA (Compile-Time Constant - Flash/Immediate - 0 Bytes RAM)
-  // ==========================================================================
+  // STATIC DATA (Compile-Time Constant - Flash/Immediate - 0 Bytes RAM) --
   template <typename T, T value>
   struct StaticData {
     template <typename O>
@@ -63,7 +59,7 @@ namespace oneData {
       using Type = T;
       using Base::Base;
 
-      static constexpr const Type& get() noexcept { return value; }
+      static constexpr const Type get() noexcept { return value; }
       
       template<typename Out> 
       void print(Out& out) const noexcept { out.put(get()); Base::print(out); }
@@ -72,9 +68,24 @@ namespace oneData {
     };
   };
 
-  // ==========================================================================
-  // DATA (Owned RAM Storage)
-  // ==========================================================================
+  // static text --
+  template <const char* const* text_ptr>
+  struct StaticText {
+    template <typename O>
+    struct Part : O {
+      using Base = O;
+      using Type = const char*;
+      using Base::Base;
+
+      template<typename Out> 
+      void print(Out& out) const noexcept { out.put(get()); Base::print(out); }
+
+      // Dereference the variable address at compile time to return a flat const char*
+      static constexpr Type get() noexcept { return *text_ptr; }
+    };
+  };
+
+  // DATA (Owned RAM Storage) --
   template <typename T>
   struct Data {
     template <typename O>
@@ -105,9 +116,7 @@ namespace oneData {
     };
   };
 
-  // ==========================================================================
-  // DATA REF (Unified External Pointer/Reference - 0 Bytes RAM)
-  // ==========================================================================
+  // DATA REF (Unified External Pointer/Reference - 0 Bytes RAM) --
   template <typename T, T address>
   struct DataRef {
     template <typename O>
@@ -134,9 +143,7 @@ namespace oneData {
       operator std::remove_cv_t<Type>() const noexcept { return get(); }    };
   };
 
-  // ==========================================================================
-  // WATCH (Change Tracking Modifier)
-  // ==========================================================================
+  // WATCH (Change Tracking Modifier) --
   template <typename W>
   struct Watch {
     template <typename O>
@@ -154,9 +161,7 @@ namespace oneData {
     };
   };
 
-  // ==========================================================================
-  // NUMBER RANGE (Dynamic Boundaries)
-  // ==========================================================================
+  // NUMBER RANGE (Dynamic Boundaries) --
   template <typename N>
   struct NumRange {
     template <typename O>
@@ -187,9 +192,7 @@ namespace oneData {
     };
   };
 
-  // ==========================================================================
-  // STATIC NUMBER RANGE (Compile-Time Boundaries - 0 Bytes RAM)
-  // ==========================================================================
+  // STATIC NUMBER RANGE (Compile-Time Boundaries - 0 Bytes RAM) --
   template <typename N, N low, N high, bool wraps = false>
   struct StaticNumRange {
     template <typename O>
@@ -208,9 +211,7 @@ namespace oneData {
     };
   };
 
-  // ==========================================================================
-  // DEFAULT (Default Value Injection Modifier)
-  // ==========================================================================
+  // DEFAULT (Default Value Injection Modifier) --
   template <typename T, T defaultValue>
   struct Default {
     template <typename O>
@@ -228,9 +229,7 @@ namespace oneData {
     };
   };
 
-  // ==========================================================================
-  // SUGAR ALIASES
-  // ==========================================================================
+  // SUGAR ALIASES --
   using Text = Data<const char *>;
   using Bool = Data<bool>;
   using Int  = Data<int>;
@@ -243,6 +242,6 @@ namespace oneData {
   template <bool* p> using BoolRef = DataRef<bool*, p>;
   template <char* p> using CharRef = DataRef<char*, p>;
   
-  template <const CText& text> using StaticText = DataRef<const CText, text>;
+  // template <const CText& text> using StaticText = DataRef<const CText, text>;
 
 }; // namespace oneData
