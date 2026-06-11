@@ -17,6 +17,11 @@
  *  using PinPort = DataRef<volatile int*, &fake_hw>;
  *  DataDef<PinPort> led_pin;
  *  led_pin.set(0xFF); // Writes directly to fake_hw
+ *
+ * 3. Static range with deferred type resolution
+ *  DataDef<StaticNumRange<StaticRange<0,100>>, Int> pct{50};
+ *  pct.up();   // 51
+ *  pct.down(); // 50
  * ============================================================================
  */
 
@@ -31,7 +36,45 @@ using hapi::APIOf;
 namespace oneData {
   using CText = const char *;
 
-  // BASE DATA API --
+  // VALUE DESCRIPTORS ----------------------------------------------------------
+  // Carry compile-time values without committing to a Unit type.
+  // Type is resolved by the chain at the call site via template method.
+
+  /// @brief compile-time value descriptor — deferred type resolution
+  template<long _value>
+  struct Val {
+    template<typename T>
+    static constexpr T value() noexcept { return static_cast<T>(_value); }
+  };
+
+  /// @brief compile-time range descriptor — deferred type resolution
+  template<long _low, long _high, bool _wraps=false>
+  struct StaticRange {
+    template<typename T>
+    static constexpr T low() noexcept { return static_cast<T>(_low); }
+    template<typename T>
+    static constexpr T high() noexcept { return static_cast<T>(_high); }
+    static constexpr bool wraps() noexcept { return _wraps; }
+
+    template<typename T>
+    static constexpr bool valid(T v) noexcept {
+      return v >= low<T>() && v <= high<T>();
+    }
+    template<typename T>
+    static constexpr T clamp(T v) noexcept {
+      return v < low<T>() ? low<T>() : v > high<T>() ? high<T>() : v;
+    }
+    template<typename T>
+    static constexpr T stepUp(T o, T s) noexcept {
+      return high<T>() - o >= s ? o + s : _wraps ? low<T>() : high<T>();
+    }
+    template<typename T>
+    static constexpr T stepDown(T o, T s) noexcept {
+      return o - low<T>() >= s ? o - s : _wraps ? high<T>() : low<T>();
+    }
+  };
+
+  // BASE DATA API --------------------------------------------------------------
   template <typename O = hapi::Nil>
   struct DataAPI : O {
     using Base = O;
@@ -50,44 +93,48 @@ namespace oneData {
 
   template <typename... OO> using DataDef = DefaultDataDef<OO...>;
 
-  // STATIC DATA (Compile-Time Constant - Flash/Immediate - 0 Bytes RAM) --
-  template <typename T, T value>
+  // STATIC DATA (Compile-Time Constant - Flash/Immediate - 0 Bytes RAM) --------
+  /// @brief StaticData<Val<42>> or StaticData<Val<42>> — type from chain
+  template<typename ValDesc>
   struct StaticData {
     template <typename O>
     struct Part : O {
       using Base = O;
-      using Type = T;
       using Base::Base;
+      using Type = typename O::Type;
 
-      static constexpr const Type get() noexcept { return value; }
-      
-      template<typename Out> 
+      static constexpr Type get() noexcept {
+        return ValDesc::template value<Type>();
+      }
+
+      template<typename Out>
       void print(Out& out) const noexcept { out.put(get()); Base::print(out); }
 
-      operator const Type&() const noexcept { return get(); }
+      operator Type() const noexcept { return get(); }
     };
   };
 
   // static text --
   template <const char* const* text_ptr>
   struct StaticText {
+    using Type = const char*;
     template <typename O>
     struct Part : O {
       using Base = O;
       using Type = const char*;
       using Base::Base;
 
-      template<typename Out> 
+      template<typename Out>
       void print(Out& out) const noexcept { out.put(get()); Base::print(out); }
 
-      // Dereference the variable address at compile time to return a flat const char*
       static constexpr Type get() noexcept { return *text_ptr; }
     };
   };
 
-  // DATA (Owned RAM Storage) --
+  // DATA (Owned RAM Storage) ---------------------------------------------------
   template <typename T>
   struct Data {
+    using Type = T;
     template <typename O>
     struct Part : O {
       using Base = O;
@@ -104,11 +151,11 @@ namespace oneData {
       constexpr Part(OO&&... oo) noexcept : Base{std::forward<OO>(oo)...} {}
 
       const std::decay_t<Type>& get() const noexcept { return data; }
-      
+
       template <typename V>
       void set(V&& v) noexcept { data = std::forward<V>(v); }
 
-      template<typename Out> 
+      template<typename Out>
       void print(Out& out) const noexcept { out.put(get()); Base::print(out); }
 
       operator std::decay_t<Type>&() noexcept             { return data; }
@@ -116,9 +163,10 @@ namespace oneData {
     };
   };
 
-  // DATA REF (Unified External Pointer/Reference - 0 Bytes RAM) --
+  // DATA REF (Unified External Pointer/Reference - 0 Bytes RAM) ---------------
   template <typename T, T address>
   struct DataRef {
+    using Type = std::remove_pointer_t<T>;
     template <typename O>
     struct Part : O {
       using Base = O;
@@ -133,19 +181,20 @@ namespace oneData {
         }
       }
 
-      static void set(Type v) noexcept {*address = v;}
-      
-      template<typename Out> 
+      static void set(Type v) noexcept { *address = v; }
+
+      template<typename Out>
       void print(Out& out) const noexcept { out.put(get()); Base::print(out); }
 
-      // Both operators present and safe for PC/Embedded environments
       operator auto&() noexcept { return get(); }
-      operator std::remove_cv_t<Type>() const noexcept { return get(); }    };
+      operator std::remove_cv_t<Type>() const noexcept { return get(); }
+    };
   };
 
-  // WATCH (Change Tracking Modifier) --
+  // WATCH (Change Tracking Modifier) ------------------------------------------
   template <typename W>
   struct Watch {
+    using Type = typename W::Type;
     template <typename O>
     struct Part : W::template Part<O> {
       using Base = typename W::template Part<O>;
@@ -161,7 +210,7 @@ namespace oneData {
     };
   };
 
-  // NUMBER RANGE (Dynamic Boundaries) --
+  // NUMBER RANGE (Dynamic Boundaries) -----------------------------------------
   template <typename N>
   struct NumRange {
     template <typename O>
@@ -182,66 +231,101 @@ namespace oneData {
           : Base{std::forward<OO>(oo)...}, m_low{low}, m_high{high}, wraps{w} {}
 
       constexpr bool valid(NRP v) const noexcept { return v >= m_low && v <= m_high; }
-      constexpr NRP clamp(NRP v) const noexcept { return v < m_low ? m_low : v > m_high ? m_high : v; }
-
-      constexpr NRP stepUp(NRP o, NRP s) noexcept { return m_high - o >= s ? o + s : wraps ? m_low : m_high; }
-      constexpr NRP stepDown(NRP s, NRP o) noexcept { return o - m_low >= s ? o - s : wraps ? m_high : m_low; }
+      constexpr NRP clamp(NRP v) const noexcept {
+        return v < m_low ? m_low : v > m_high ? m_high : v;
+      }
+      constexpr NRP stepUp(NRP o, NRP s) noexcept {
+        return m_high - o >= s ? o + s : wraps ? m_low : m_high;
+      }
+      constexpr NRP stepDown(NRP s, NRP o) noexcept {
+        return o - m_low >= s ? o - s : wraps ? m_high : m_low;
+      }
 
       void up(NRP s = 1) noexcept { set(stepUp(get(), s)); }
       void down(NRP s = 1) noexcept { set(stepDown(s, get())); }
     };
   };
 
-  // STATIC NUMBER RANGE (Compile-Time Boundaries - 0 Bytes RAM) --
-  template <typename N, N low, N high, bool wraps = false>
+  // STATIC NUMBER RANGE (Compile-Time Boundaries - 0 Bytes RAM) ---------------
+  /// @brief StaticNumRange<StaticRange<0,100>> or StaticNumRange<StaticRange<0,255,true>>
+  template<typename RangeDesc>
   struct StaticNumRange {
     template <typename O>
     struct Part : O {
-      using Type = N;
       using Base = O;
       using Base::Base;
+      using Type = typename O::Type;
       using Base::get;
       using Base::set;
 
-      static constexpr bool valid(N v) noexcept { return v >= low && v <= high; }
-      static constexpr N clamp(N v) noexcept { return v < low ? low : v > high ? high : v; }
+      static constexpr bool valid(Type v) noexcept {
+        return RangeDesc::template valid<Type>(v);
+      }
+      static constexpr Type clamp(Type v) noexcept {
+        return RangeDesc::template clamp<Type>(v);
+      }
 
-      void up(N step = 1) noexcept { set(clamp(get() + step)); }
-      void down(N step = 1) noexcept { set(clamp(get() - step)); }
+      void up(Type step=1) noexcept {
+        set(RangeDesc::template stepUp<Type>(get(), step));
+      }
+      void down(Type step=1) noexcept {
+        set(RangeDesc::template stepDown<Type>(get(), step));
+      }
     };
   };
 
-  // DEFAULT (Default Value Injection Modifier) --
-  template <typename T, T defaultValue>
+  // DEFAULT (Default Value Injection Modifier) ---------------------------------
+  /// @brief wraps a data component, injecting a compile-time default value
+  /// Default<Data<int>, 0>
+  /// Watch<Default<Data<int>, 0>>  — composable freely
+  template<typename W, typename W::Type val>
   struct Default {
+    using Type = typename W::Type;
     template <typename O>
-    struct Part : O {
-      using Base = O;
-      using Base::Base;
+    struct Part : W::template Part<O> {
+      using Base = typename W::template Part<O>;
+      using Type = typename Base::Type;
+      // no using Base::Base — prevents zero-init constructor from winning
+
+      constexpr Part() noexcept
+          : Base{val} {}
 
       template <typename... OO>
       constexpr Part(OO&&... oo) noexcept
-          : Base{defaultValue, std::forward<OO>(oo)...} {}
-
-      template <typename... OO>
-      constexpr Part(T val, OO&&... oo) noexcept
           : Base{val, std::forward<OO>(oo)...} {}
+
+      constexpr Part(Type v) noexcept
+          : Base{v} {}
     };
   };
 
-  // SUGAR ALIASES --
+  // SUGAR ALIASES --------------------------------------------------------------
   using Text = Data<const char *>;
   using Bool = Data<bool>;
   using Int  = Data<int>;
 
-  template <int v>  using StaticInt  = StaticData<int, v>;
-  template <bool v> using StaticBool = StaticData<bool, v>;
-  template <char v> using StaticChar = StaticData<char, v>;
+  // StaticData with explicit type — standalone use without chain Type
+  template<typename T, T v>
+  struct StaticVal {
+    using Type = T;
+    template<typename O>
+    struct Part : O {
+      using Base = O;
+      using Base::Base;
+      using Type = T;
+      static constexpr Type get() noexcept { return v; }
+      template<typename Out>
+      void print(Out& out) const noexcept { out.put(get()); Base::print(out); }
+      operator Type() const noexcept { return get(); }
+    };
+  };
 
-  template <int* p>  using IntRef  = DataRef<int*, p>;
-  template <bool* p> using BoolRef = DataRef<bool*, p>;
-  template <char* p> using CharRef = DataRef<char*, p>;
-  
-  // template <const CText& text> using StaticText = DataRef<const CText, text>;
+  template<int v>  using StaticInt  = StaticVal<int, v>;
+  template<bool v> using StaticBool = StaticVal<bool, v>;
+  template<char v> using StaticChar = StaticVal<char, v>;
+
+  template<int* p>  using IntRef  = DataRef<int*, p>;
+  template<bool* p> using BoolRef = DataRef<bool*, p>;
+  template<char* p> using CharRef = DataRef<char*, p>;
 
 }; // namespace oneData
