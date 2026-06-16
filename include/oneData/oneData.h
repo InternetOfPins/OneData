@@ -72,6 +72,8 @@ namespace oneData {
     static constexpr bool changed() noexcept { return false; }
     static constexpr void sync() noexcept {}
     template<typename Out> void print(Out& out) const noexcept {}
+    template<typename T> T&       operator[](std::size_t) noexcept       { __builtin_unreachable(); }
+    template<typename T> const T& operator[](std::size_t) const noexcept { __builtin_unreachable(); }
   };
 
   template <typename... OO> using DataDef = APIOf<DataAPI<>, OO...>;
