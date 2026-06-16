@@ -4,12 +4,12 @@
  *
  * Tests:
  *   Data<T>           — owned RAM storage, get/set
- *   StaticVal / sugar — compile-time constant
+ *   StaticData        — compile-time constant
  *   Watch             — change tracking (changed/sync)
  *   StaticNumRange    — compile-time range up/down/clamp
  *   NumRange          — runtime range up/down
  *   Default           — default value injection
- *   DataRef / IntRef  — external variable reference
+ *   DataRef           — external variable reference
  *   DataDef           — composition closes chain
  */
 
@@ -45,12 +45,12 @@ void test_data_bool() {
 }
 
 void test_static_val() {
-  DataDef<StaticInt<99>> d;
+  DataDef<StaticData<99>> d;
   assert(d.get() == 99);
-  static_assert(DataDef<StaticInt<99>>::get() == 99);
-  DataDef<StaticBool<true>> b;
+  static_assert(DataDef<StaticData<99>>::get() == 99);
+  DataDef<StaticData<true>> b;
   assert(b.get());
-  cout << "StaticVal (StaticInt/StaticBool): ok" << endl;
+  cout << "StaticData: ok" << endl;
 }
 
 void test_watch() {
@@ -120,12 +120,12 @@ inline int ext_var = 0;
 
 void test_data_ref() {
   ext_var = 99;
-  DataDef<IntRef<&ext_var>> d;
+  DataDef<DataRef<&ext_var>> d;
   assert(d.get() == 99);
   d.set(123);
   assert(ext_var  == 123);
   assert(d.get()  == 123);
-  cout << "DataRef/IntRef: ok" << endl;
+  cout << "DataRef: ok" << endl;
 }
 
 void doTests() {
