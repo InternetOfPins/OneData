@@ -27,8 +27,8 @@
 
 #pragma once
 
-#include <type_traits>
-#include <utility>
+// #include <type_traits>
+// #include <utility>
 
 #include <hapi/hapi.h>
 using hapi::APIOf;
@@ -85,13 +85,7 @@ namespace oneData {
     template<typename Out> void print(Out& out) const noexcept {}
   };
 
-  template <typename... OO>
-  struct DefaultDataDef : APIOf<DataAPI<>, OO...> {
-    using Base = APIOf<DataAPI<>, OO...>;
-    using Base::Base;
-  };
-
-  template <typename... OO> using DataDef = DefaultDataDef<OO...>;
+  template <typename... OO> using DataDef = APIOf<DataAPI<>, OO...>;
 
   // STATIC DATA (Compile-Time Constant - Flash/Immediate - 0 Bytes RAM) --------
   /// @brief StaticData<Val<42>> or StaticData<Val<42>> — type from chain
@@ -143,9 +137,13 @@ namespace oneData {
 
       Type data{};
 
+      // template <typename V, typename... OO>
+      // constexpr Part(V&& val, OO&&... oo) noexcept
+      //     : Base{std::forward<OO>(oo)...}, data{std::forward<V>(val)} {}
+
       template <typename V, typename... OO>
-      constexpr Part(V&& val, OO&&... oo) noexcept
-          : Base{std::forward<OO>(oo)...}, data{std::forward<V>(val)} {}
+      constexpr Part(V v, OO&&... oo) noexcept
+          : Base{std::forward<OO>(oo)...}, data{v} {}
 
       template <typename... OO>
       constexpr Part(OO&&... oo) noexcept : Base{std::forward<OO>(oo)...} {}

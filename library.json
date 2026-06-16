@@ -3,6 +3,9 @@
   "version": "0.1.13",
   "description": "HAPI data components",
   "keywords": "components, data",
+  "build": {
+    "srcFilter": ["-<*>"]
+  },
   "repository":
   {
     "type": "git",
