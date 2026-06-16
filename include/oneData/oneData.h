@@ -41,14 +41,14 @@ namespace oneData {
   // Type is resolved by the chain at the call site via template method.
 
   /// @brief compile-time value descriptor — deferred type resolution
-  template<long _value>
+  template<auto _value>
   struct Val {
     template<typename T>
     static constexpr T value() noexcept { return static_cast<T>(_value); }
   };
 
   /// @brief compile-time range descriptor — deferred type resolution
-  template<long _low, long _high, bool _wraps=false>
+  template<auto _low, auto _high, bool _wraps=false>
   struct StaticRange {
     template<typename T>
     static constexpr T low() noexcept { return static_cast<T>(_low); }
@@ -162,13 +162,13 @@ namespace oneData {
   };
 
   // DATA REF (Unified External Pointer/Reference - 0 Bytes RAM) ---------------
-  template <typename T, T address>
+  template <auto address>
   struct DataRef {
-    using Type = std::remove_pointer_t<T>;
+    using Type = std::remove_pointer_t<decltype(address)>;
     template <typename O>
     struct Part : O {
       using Base = O;
-      using Type = std::remove_pointer_t<T>;
+      using Type = std::remove_pointer_t<decltype(address)>;
       using Base::Base;
 
       static auto& get() noexcept {
@@ -276,7 +276,7 @@ namespace oneData {
   /// @brief wraps a data component, injecting a compile-time default value
   /// Default<Data<int>, 0>
   /// Watch<Default<Data<int>, 0>>  — composable freely
-  template<typename W, typename W::Type val>
+  template<typename W, auto val>
   struct Default {
     using Type = typename W::Type;
     template <typename O>
@@ -303,14 +303,14 @@ namespace oneData {
   using Int  = Data<int>;
 
   // StaticData with explicit type — standalone use without chain Type
-  template<typename T, T v>
+  template<auto v>
   struct StaticVal {
-    using Type = T;
+    using Type = decltype(v);
     template<typename O>
     struct Part : O {
       using Base = O;
       using Base::Base;
-      using Type = T;
+      using Type = decltype(v);
       static constexpr Type get() noexcept { return v; }
       template<typename Out>
       void print(Out& out) const noexcept { out.put(get()); Base::print(out); }
@@ -318,12 +318,12 @@ namespace oneData {
     };
   };
 
-  template<int v>  using StaticInt  = StaticVal<int, v>;
-  template<bool v> using StaticBool = StaticVal<bool, v>;
-  template<char v> using StaticChar = StaticVal<char, v>;
+  template<int v>  using StaticInt  = StaticVal<v>;
+  template<bool v> using StaticBool = StaticVal<v>;
+  template<char v> using StaticChar = StaticVal<v>;
 
-  template<int* p>  using IntRef  = DataRef<int*, p>;
-  template<bool* p> using BoolRef = DataRef<bool*, p>;
-  template<char* p> using CharRef = DataRef<char*, p>;
+  template<auto p> using IntRef  = DataRef<p>;
+  template<auto p> using BoolRef = DataRef<p>;
+  template<auto p> using CharRef = DataRef<p>;
 
 }; // namespace oneData

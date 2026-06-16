@@ -2,7 +2,7 @@
 //
 // Verifies OneData components under the mono_block HAPI chain:
 //   1. Data<T>         — owned RAM storage, get/set
-//   2. DataRef<T*,p>   — zero-RAM external pointer, get/set
+//   2. DataRef<&p>     — zero-RAM external pointer, get/set
 //   3. Watch<Data<T>>  — change tracking composable over Data
 //   4. StaticNumRange  — compile-time boundaries, up/down
 //   5. Default<W,val>  — default value injection
@@ -33,7 +33,7 @@ void test_data_owned() {
 static volatile int hw_reg{};
 
 void test_data_ref() {
-  using PinPort = DataRef<volatile int*, &hw_reg>;
+  using PinPort = DataRef<&hw_reg>;
   DataDef<PinPort> pin;
   pin.set(0xFF);
   assert(hw_reg == 0xFF);
