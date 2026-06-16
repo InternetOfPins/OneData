@@ -69,9 +69,10 @@ compile_ms() {
     echo "  find_last  - find_first ≈ FindFirst traversal cost per step"
     echo ""
 
-    declare -a TESTS=( baseline flat_chain watch_stack find_first find_last foreach )
+    declare -a TESTS=( baseline flat_chain watch_stack find_first find_last foreach at_tagged idx_chain )
     declare -a DEFS=(  TEST_BASELINE TEST_FLAT_CHAIN TEST_WATCH_STACK \
-                       TEST_FIND_FIRST TEST_FIND_LAST TEST_FOREACH )
+                       TEST_FIND_FIRST TEST_FIND_LAST TEST_FOREACH \
+                       TEST_AT_TAGGED TEST_IDX_CHAIN )
     read -ra SIZE_ARR <<< "${SIZES}"
 
     printf "%-14s" ""

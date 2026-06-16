@@ -65,6 +65,55 @@ struct WatchStack { using Type = typename WatchStack<N-1, Watch<W>>::Type; };
 template<typename W>
 struct WatchStack<0, W> { using Type = W; };
 
+// ── At<I> vs Idx<i,T>: compile-time tag cost ─────────────────────────────────
+
+// Separate complete tag bases (avoids inheriting from incomplete enclosing template)
+template<std::size_t I>           struct AtTag {};      // 1-param: just an index
+template<std::size_t I,typename T> struct IdxTag {};    // 2-params: index + type
+
+// At<I>: positional tag — one size_t param, Part<O> inherits O + AtTag<I> (EBO)
+template<std::size_t I>
+struct At : AtTag<I> {
+    template<typename O>
+    struct Part : O, AtTag<I> {
+        using Base = O;
+        using Base::Base;
+    };
+};
+
+// Idx<I,T>: positional tag carrying T — two params, Part<O> inherits T::Part<O> + IdxTag<I,T>
+template<std::size_t I, typename T>
+struct Idx : IdxTag<I,T> {
+    template<typename O>
+    struct Part : T::template Part<O>, IdxTag<I,T> {
+        using Base = typename T::template Part<O>;
+        using Base::Base;
+    };
+};
+
+// AtTagged<I>: Data<int> + AtTag<I> base — direct comparison with Idx<I, Data<int>>
+// tag is AtTag<I> (1 param) vs IdxTag<I,T> (2 params) — same data, different tag cost
+template<std::size_t I>
+struct AtTagged {
+    template<typename O>
+    struct Part : Data<int>::template Part<O>, AtTag<I> {
+        using Base = typename Data<int>::template Part<O>;
+        using Base::Base;
+    };
+};
+
+template<typename Seq> struct GenAtTagged;
+template<std::size_t... Is>
+struct GenAtTagged<std::index_sequence<Is...>> {
+    using Type = DataDef<AtTagged<Is>...>;
+};
+
+template<typename Seq> struct GenIdx;
+template<std::size_t... Is>
+struct GenIdx<std::index_sequence<Is...>> {
+    using Type = DataDef<Idx<Is, Data<int>>...>;
+};
+
 #ifdef TEST_RUNTIME
 volatile int g_sink = 0;
 #endif
@@ -102,6 +151,14 @@ int main() {
 #elif defined(TEST_FOREACH)
     using Node = typename GenFlat<std::make_index_sequence<TEST_SIZE>>::Type;
     { Node node; hapi::forEach<hapi::TagIs<DataTag>>(node, [](auto&){}); }
+
+#elif defined(TEST_AT_TAGGED)
+    using Node = typename GenAtTagged<std::make_index_sequence<TEST_SIZE>>::Type;
+    { Node node{}; (void)node; }
+
+#elif defined(TEST_IDX_CHAIN)
+    using Node = typename GenIdx<std::make_index_sequence<TEST_SIZE>>::Type;
+    { Node node{}; (void)node; }
 
 #elif defined(TEST_RUNTIME)
     using SC = std::chrono::steady_clock;
