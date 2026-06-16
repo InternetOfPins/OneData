@@ -14,7 +14,7 @@
  *
  * 2. External Hardware/Variable Reference via Pointer (0 Bytes RAM)
  *  inline volatile int fake_hw{};
- *  using PinPort = DataRef<volatile int*, &fake_hw>;
+ *  using PinPort = DataRef<&fake_hw>;
  *  DataDef<PinPort> led_pin;
  *  led_pin.set(0xFF); // Writes directly to fake_hw
  *
@@ -35,17 +35,6 @@ using hapi::APIOf;
 
 namespace oneData {
   using CText = const char *;
-
-  // VALUE DESCRIPTORS ----------------------------------------------------------
-  // Carry compile-time values without committing to a Unit type.
-  // Type is resolved by the chain at the call site via template method.
-
-  /// @brief compile-time value descriptor — deferred type resolution
-  template<auto _value>
-  struct Val {
-    template<typename T>
-    static constexpr T value() noexcept { return static_cast<T>(_value); }
-  };
 
   /// @brief compile-time range descriptor — deferred type resolution
   template<auto _low, auto _high, bool _wraps=false>
@@ -88,8 +77,8 @@ namespace oneData {
   template <typename... OO> using DataDef = APIOf<DataAPI<>, OO...>;
 
   // STATIC DATA (Compile-Time Constant - Flash/Immediate - 0 Bytes RAM) --------
-  /// @brief StaticData<Val<42>> or StaticData<Val<42>> — type from chain
-  template<typename ValDesc>
+  /// @brief StaticData<42> — value cast to chain Type at call site
+  template<auto _value>
   struct StaticData {
     template <typename O>
     struct Part : O {
@@ -97,9 +86,7 @@ namespace oneData {
       using Base::Base;
       using Type = typename O::Type;
 
-      static constexpr Type get() noexcept {
-        return ValDesc::template value<Type>();
-      }
+      static constexpr Type get() noexcept { return static_cast<Type>(_value); }
 
       template<typename Out>
       void print(Out& out) const noexcept { out.put(get()); Base::print(out); }
