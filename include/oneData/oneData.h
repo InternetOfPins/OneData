@@ -77,16 +77,17 @@ namespace oneData {
   template <typename... OO> using DataDef = APIOf<DataAPI<>, OO...>;
 
   // STATIC DATA (Compile-Time Constant - Flash/Immediate - 0 Bytes RAM) --------
-  /// @brief StaticData<42> — value cast to chain Type at call site
+  /// @brief StaticData<42> / StaticData<true> / StaticData<'A'> — 0 bytes RAM, Type from value
   template<auto _value>
   struct StaticData {
+    using Type = decltype(_value);
     template <typename O>
     struct Part : O {
       using Base = O;
       using Base::Base;
-      using Type = typename O::Type;
+      using Type = decltype(_value);
 
-      static constexpr Type get() noexcept { return static_cast<Type>(_value); }
+      static constexpr Type get() noexcept { return _value; }
 
       template<typename Out>
       void print(Out& out) const noexcept { out.put(get()); Base::print(out); }
@@ -289,28 +290,5 @@ namespace oneData {
   using Bool = Data<bool>;
   using Int  = Data<int>;
 
-  // StaticData with explicit type — standalone use without chain Type
-  template<auto v>
-  struct StaticVal {
-    using Type = decltype(v);
-    template<typename O>
-    struct Part : O {
-      using Base = O;
-      using Base::Base;
-      using Type = decltype(v);
-      static constexpr Type get() noexcept { return v; }
-      template<typename Out>
-      void print(Out& out) const noexcept { out.put(get()); Base::print(out); }
-      operator Type() const noexcept { return get(); }
-    };
-  };
-
-  template<int v>  using StaticInt  = StaticVal<v>;
-  template<bool v> using StaticBool = StaticVal<v>;
-  template<char v> using StaticChar = StaticVal<v>;
-
-  template<auto p> using IntRef  = DataRef<p>;
-  template<auto p> using BoolRef = DataRef<p>;
-  template<auto p> using CharRef = DataRef<p>;
 
 }; // namespace oneData
