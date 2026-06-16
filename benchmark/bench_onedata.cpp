@@ -65,38 +65,29 @@ struct WatchStack { using Type = typename WatchStack<N-1, Watch<W>>::Type; };
 template<typename W>
 struct WatchStack<0, W> { using Type = W; };
 
-// ── At<I> vs Idx<i,T>: compile-time tag cost ─────────────────────────────────
+// ── IdxTag<I> vs Idx<i,T>: compile-time tag cost ─────────────────────────────
+// Compares: 1-param tag (hapi::IdxTag<I>) vs 2-param tag (Idx<I,T>)
+// Both wrap Data<int> — same data, different tag complexity
 
-// Separate complete tag bases (avoids inheriting from incomplete enclosing template)
-template<std::size_t I>           struct AtTag {};      // 1-param: just an index
-template<std::size_t I,typename T> struct IdxTag {};    // 2-params: index + type
+// 2-param tag base (benchmark-internal, mirrors hapi::IdxTag but with type param)
+template<std::size_t I, typename T> struct BIdxTag {};
 
-// At<I>: positional tag — one size_t param, Part<O> inherits O + AtTag<I> (EBO)
-template<std::size_t I>
-struct At : AtTag<I> {
-    template<typename O>
-    struct Part : O, AtTag<I> {
-        using Base = O;
-        using Base::Base;
-    };
-};
-
-// Idx<I,T>: positional tag carrying T — two params, Part<O> inherits T::Part<O> + IdxTag<I,T>
+// Idx<I,T>: positional tag carrying T — two params, Part<O> inherits T::Part<O> + BIdxTag<I,T>
 template<std::size_t I, typename T>
-struct Idx : IdxTag<I,T> {
+struct Idx : BIdxTag<I,T> {
     template<typename O>
-    struct Part : T::template Part<O>, IdxTag<I,T> {
+    struct Part : T::template Part<O>, BIdxTag<I,T> {
         using Base = typename T::template Part<O>;
         using Base::Base;
     };
 };
 
-// AtTagged<I>: Data<int> + AtTag<I> base — direct comparison with Idx<I, Data<int>>
-// tag is AtTag<I> (1 param) vs IdxTag<I,T> (2 params) — same data, different tag cost
+// AtTagged<I>: Data<int> + hapi::IdxTag<I> base — direct comparison with Idx<I, Data<int>>
+// tag is IdxTag<I> (1 param) vs BIdxTag<I,T> (2 params) — same data, different tag cost
 template<std::size_t I>
 struct AtTagged {
     template<typename O>
-    struct Part : Data<int>::template Part<O>, AtTag<I> {
+    struct Part : Data<int>::template Part<O>, hapi::IdxTag<I> {
         using Base = typename Data<int>::template Part<O>;
         using Base::Base;
     };
