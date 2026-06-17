@@ -65,6 +65,16 @@ struct WatchStack { using Type = typename WatchStack<N-1, Watch<W>>::Type; };
 template<typename W>
 struct WatchStack<0, W> { using Type = W; };
 
+// ── At<N> array + Mapped<F> transform ────────────────────────────────────────
+struct Inc { constexpr int operator()(int n) const { return n + 1; } };
+
+template<typename Seq> struct GenAt;
+template<std::size_t... Is>
+struct GenAt<std::index_sequence<Is...>> {
+    using Type    = DataDef<hapi::At<Is>...>;
+    using Mapped  = DataDef<hapi::Mapped<Inc>, hapi::At<Is>...>;
+};
+
 // ── IdxTag<I> vs Idx<i,T>: compile-time tag cost ─────────────────────────────
 // Compares: 1-param tag (hapi::IdxTag<I>) vs 2-param tag (Idx<I,T>)
 // Both wrap Data<int> — same data, different tag complexity
@@ -149,6 +159,14 @@ int main() {
 
 #elif defined(TEST_IDX_CHAIN)
     using Node = typename GenIdx<std::make_index_sequence<TEST_SIZE>>::Type;
+    { Node node{}; (void)node; }
+
+#elif defined(TEST_AT_ARRAY)
+    using Node = typename GenAt<std::make_index_sequence<TEST_SIZE>>::Type;
+    { Node node{}; (void)node; }
+
+#elif defined(TEST_MAPPED)
+    using Node = typename GenAt<std::make_index_sequence<TEST_SIZE>>::Mapped;
     { Node node{}; (void)node; }
 
 #elif defined(TEST_RUNTIME)
