@@ -36,33 +36,6 @@ using hapi::APIOf;
 namespace oneData {
   using CText = const char *;
 
-  /// @brief compile-time range descriptor — deferred type resolution
-  template<auto _low, auto _high, bool _wraps=false>
-  struct StaticRange {
-    template<typename T>
-    static constexpr T low() noexcept { return static_cast<T>(_low); }
-    template<typename T>
-    static constexpr T high() noexcept { return static_cast<T>(_high); }
-    static constexpr bool wraps() noexcept { return _wraps; }
-
-    template<typename T>
-    static constexpr bool valid(T v) noexcept {
-      return v >= low<T>() && v <= high<T>();
-    }
-    template<typename T>
-    static constexpr T clamp(T v) noexcept {
-      return v < low<T>() ? low<T>() : v > high<T>() ? high<T>() : v;
-    }
-    template<typename T>
-    static constexpr T stepUp(T o, T s) noexcept {
-      return high<T>() - o >= s ? o + s : _wraps ? low<T>() : high<T>();
-    }
-    template<typename T>
-    static constexpr T stepDown(T o, T s) noexcept {
-      return o - low<T>() >= s ? o - s : _wraps ? high<T>() : low<T>();
-    }
-  };
-
   // BASE DATA API --------------------------------------------------------------
   template <typename O = hapi::Nil>
   struct DataAPI : O {
@@ -179,6 +152,13 @@ namespace oneData {
     };
   };
 
+  // SUGAR ALIASES --------------------------------------------------------------
+  using Text = Data<const char *>;
+  using Bool = Data<bool>;
+  using Int  = Data<int>;
+
+  //================================================================================--
+
   // WATCH (Change Tracking Modifier) ------------------------------------------
   template <typename W>
   struct Watch {
@@ -196,6 +176,33 @@ namespace oneData {
       constexpr bool changed() const noexcept { return get() != watched; }
       void sync() noexcept { watched = get(); }
     };
+  };
+
+  /// @brief compile-time range descriptor — deferred type resolution --
+  template<auto _low, auto _high, bool _wraps=false>
+  struct StaticRange {
+    template<typename T>
+    static constexpr T low() noexcept { return static_cast<T>(_low); }
+    template<typename T>
+    static constexpr T high() noexcept { return static_cast<T>(_high); }
+    static constexpr bool wraps() noexcept { return _wraps; }
+
+    template<typename T>
+    static constexpr bool valid(T v) noexcept {
+      return v >= low<T>() && v <= high<T>();
+    }
+    template<typename T>
+    static constexpr T clamp(T v) noexcept {
+      return v < low<T>() ? low<T>() : v > high<T>() ? high<T>() : v;
+    }
+    template<typename T>
+    static constexpr T stepUp(T o, T s) noexcept {
+      return high<T>() - o >= s ? o + s : _wraps ? low<T>() : high<T>();
+    }
+    template<typename T>
+    static constexpr T stepDown(T o, T s) noexcept {
+      return o - low<T>() >= s ? o - s : _wraps ? high<T>() : low<T>();
+    }
   };
 
   // NUMBER RANGE (Dynamic Boundaries) -----------------------------------------
@@ -286,11 +293,6 @@ namespace oneData {
           : Base{v} {}
     };
   };
-
-  // SUGAR ALIASES --------------------------------------------------------------
-  using Text = Data<const char *>;
-  using Bool = Data<bool>;
-  using Int  = Data<int>;
 
 
 }; // namespace oneData
