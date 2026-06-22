@@ -30,6 +30,8 @@
 // #include <type_traits>
 // #include <utility>
 
+#include <cstring>
+#include <cstdlib>
 #include <hapi/hapi.h>
 using hapi::APIOf;
 
@@ -88,6 +90,34 @@ namespace oneData {
     };
   };
 
+  // Multi-language static text.
+  //
+  // Language is selected at the outer type level — no plumbing needed at each use site:
+  //   MultiLangText::current = 2;           // switch language globally
+  //
+  // Text data is bound one level in:
+  //   static const char* const spd[] = {"Speed", "Vitesse", "Velocidade"};
+  //   using SpeedLabel = MultiLangText::Of<spd>;  // HAPI component
+  struct MultiLangText {
+    static inline uint8_t current = 0;
+
+    template<const char* const* texts>
+    struct Of {
+      using Type = const char*;
+      template<typename O>
+      struct Part : O {
+        using Base = O;
+        using Type = const char*;
+        using Base::Base;
+
+        static const char* get() noexcept { return texts[current]; }
+
+        template<typename Out>
+        void print(Out& out) const noexcept { out.put(get()); Base::print(out); }
+      };
+    };
+  };
+
   // DATA (Owned RAM Storage) ---------------------------------------------------
   template <typename T>
   struct Data {
@@ -121,6 +151,41 @@ namespace oneData {
 
       operator std::decay_t<Type>&() noexcept             { return data; }
       operator const std::decay_t<Type>&() const noexcept { return data; }
+    };
+  };
+
+  // DATA specialization for char arrays — supports set(const char*) via strncpy.
+  // Use Data<char[N]> wherever a fixed-length string buffer is needed with
+  // uniform get()/set() access (e.g. TextField buffer, web form fields).
+  template <size_t N>
+  struct Data<char[N]> {
+    using Type = char[N];
+    template <typename O>
+    struct Part : O {
+      using Base = O;
+      using Base::Base;
+
+      char data[N]{};
+
+      const char* get() const noexcept { return data; }
+      char*       get()       noexcept { return data; }
+
+      void set(const char* s) noexcept {
+        strncpy(data, s, N - 1);
+        data[N - 1] = '\0';
+      }
+
+      template<typename Out>
+      void print(Out& out) const noexcept { out.put(data); Base::print(out); }
+
+      operator const char*() const noexcept { return data; }
+      operator       char*()       noexcept { return data; }
+
+      template<typename Nav,typename P>
+      bool setStr(Nav&,const char* s,P p) noexcept {
+        if(p.len==0) { set(s); return true; }
+        return false;
+      }
     };
   };
 
@@ -238,6 +303,18 @@ namespace oneData {
 
       void up(NRP s = 1) noexcept { set(stepUp(get(), s)); }
       void down(NRP s = 1) noexcept { set(stepDown(s, get())); }
+
+      template<typename Nav,typename P>
+      bool setStr(Nav&,const char* s,P p) noexcept {
+        if(p.len==0) {
+          if constexpr(std::is_floating_point_v<NRP>)
+            set(clamp(static_cast<NRP>(std::strtod(s,nullptr))));
+          else
+            set(clamp(static_cast<NRP>(std::strtol(s,nullptr,10))));
+          return true;
+        }
+        return Base::template setStr(*this,s,p);
+      }
     };
   };
 
@@ -265,6 +342,18 @@ namespace oneData {
       }
       void down(Type step=1) noexcept {
         set(RangeDesc::template stepDown<Type>(get(), step));
+      }
+
+      template<typename Nav,typename P>
+      bool setStr(Nav&,const char* s,P p) noexcept {
+        if(p.len==0) {
+          if constexpr(std::is_floating_point_v<Type>)
+            set(clamp(static_cast<Type>(std::strtod(s,nullptr))));
+          else
+            set(clamp(static_cast<Type>(std::strtol(s,nullptr,10))));
+          return true;
+        }
+        return Base::template setStr(*this,s,p);
       }
     };
   };
