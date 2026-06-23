@@ -27,11 +27,13 @@
 
 #pragma once
 
-// #include <type_traits>
-// #include <utility>
-
-#include <cstring>
-#include <cstdlib>
+#ifdef __AVR__
+  #include <string.h>
+  #include <stdlib.h>
+#else
+  #include <cstring>
+  #include <cstdlib>
+#endif
 #include <hapi/hapi.h>
 using hapi::APIOf;
 
@@ -307,10 +309,10 @@ namespace oneData {
       template<typename Nav,typename P>
       bool setStr(Nav&,const char* s,P p) noexcept {
         if(p.len==0) {
-          if constexpr(std::is_floating_point_v<NRP>)
-            set(clamp(static_cast<NRP>(std::strtod(s,nullptr))));
+          if constexpr(std::is_floating_point<NRP>::value)
+            set(clamp(static_cast<NRP>(strtod(s,nullptr))));
           else
-            set(clamp(static_cast<NRP>(std::strtol(s,nullptr,10))));
+            set(clamp(static_cast<NRP>(strtol(s,nullptr,10))));
           return true;
         }
         return Base::template setStr(*this,s,p);
@@ -347,10 +349,10 @@ namespace oneData {
       template<typename Nav,typename P>
       bool setStr(Nav&,const char* s,P p) noexcept {
         if(p.len==0) {
-          if constexpr(std::is_floating_point_v<Type>)
-            set(clamp(static_cast<Type>(std::strtod(s,nullptr))));
+          if constexpr(std::is_floating_point<Type>::value)
+            set(clamp(static_cast<Type>(strtod(s,nullptr))));
           else
-            set(clamp(static_cast<Type>(std::strtol(s,nullptr,10))));
+            set(clamp(static_cast<Type>(strtol(s,nullptr,10))));
           return true;
         }
         return Base::template setStr(*this,s,p);
