@@ -76,6 +76,7 @@ namespace oneData {
   };
 
   // static text --
+  /// @brief compile-time string literal bound to a const char* const* pointer; get() returns *text_ptr
   template <const char* const* text_ptr>
   struct StaticText {
     using Type = const char*;
@@ -100,6 +101,7 @@ namespace oneData {
   // Text data is bound one level in:
   //   static const char* const spd[] = {"Speed", "Vitesse", "Velocidade"};
   //   using SpeedLabel = MultiLangText::Of<spd>;  // HAPI component
+  /// @brief selectable multi-language string array; current language set via MultiLangText::current
   struct MultiLangText {
     static inline uint8_t current = 0;
 
@@ -121,6 +123,7 @@ namespace oneData {
   };
 
   // DATA (Owned RAM Storage) ---------------------------------------------------
+  /// @brief mutable value with RAM storage; get() returns reference, set() writes, print() emits to output
   template <typename T>
   struct Data {
     using Type = T;
@@ -192,6 +195,7 @@ namespace oneData {
   };
 
   // DATA REF (Unified External Pointer/Reference - 0 Bytes RAM) ---------------
+  /// @brief reference to an external variable; get/set forward directly to *address (0 bytes RAM)
   template <auto address>
   struct DataRef {
     using Type = std::remove_pointer_t<decltype(address)>;
@@ -226,7 +230,7 @@ namespace oneData {
 
   //================================================================================--
 
-  // WATCH (Change Tracking Modifier) ------------------------------------------
+  /// @brief change-tracking modifier: changed() returns true when value differs from last sync()
   template <typename W>
   struct Watch {
     using Type = typename W::Type;
@@ -272,7 +276,7 @@ namespace oneData {
     }
   };
 
-  // NUMBER RANGE (Dynamic Boundaries) -----------------------------------------
+  /// @brief runtime-configurable numeric range; clamps get/set to [low, high] with optional step
   template <typename N>
   struct NumRange {
     template <typename O>
