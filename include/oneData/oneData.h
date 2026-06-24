@@ -141,7 +141,7 @@ namespace oneData {
 
       template <typename V, typename... OO>
       constexpr Part(V v, OO&&... oo) noexcept
-          : Base{std::forward<OO>(oo)...}, data{v} {}
+          : Base{std::forward<OO>(oo)...}, data(static_cast<std::decay_t<Type>>(v)) {}
 
       template <typename... OO>
       constexpr Part(OO&&... oo) noexcept : Base{std::forward<OO>(oo)...} {}
