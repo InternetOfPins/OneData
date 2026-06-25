@@ -48,7 +48,8 @@ namespace oneData {
 
     static constexpr bool changed() noexcept { return false; }
     static constexpr void sync() noexcept {}
-    template<typename Out> void print(Out& out) const noexcept {}
+    template<typename Out> static constexpr void print(Out&) noexcept {}
+    template<typename Out,typename Ctx> static constexpr void printItem(Out&,Ctx&) noexcept {}
     template<typename T> T&       operator[](std::size_t) noexcept       { __builtin_unreachable(); }
     template<typename T> const T& operator[](std::size_t) const noexcept { __builtin_unreachable(); }
   };
@@ -70,6 +71,8 @@ namespace oneData {
 
       template<typename Out>
       void print(Out& out) const noexcept { out.put(get()); Base::print(out); }
+      template<typename Out,typename Ctx>
+      void printItem(Out& out,Ctx& ctx) noexcept { out.put(get()); Base::printItem(out,ctx); }
 
       operator Type() const noexcept { return get(); }
     };
@@ -88,6 +91,8 @@ namespace oneData {
 
       template<typename Out>
       void print(Out& out) const noexcept { out.put(get()); Base::print(out); }
+      template<typename Out,typename Ctx>
+      void printItem(Out& out,Ctx& ctx) noexcept { out.put(get()); Base::printItem(out,ctx); }
 
       static constexpr Type get() noexcept { return *text_ptr; }
     };
@@ -118,6 +123,8 @@ namespace oneData {
 
         template<typename Out>
         void print(Out& out) const noexcept { out.put(get()); Base::print(out); }
+        template<typename Out,typename Ctx>
+        void printItem(Out& out,Ctx& ctx) noexcept { out.put(get()); Base::printItem(out,ctx); }
       };
     };
   };
@@ -153,6 +160,8 @@ namespace oneData {
 
       template<typename Out>
       void print(Out& out) const noexcept { out.put(get()); Base::print(out); }
+      template<typename Out,typename Ctx>
+      void printItem(Out& out,Ctx& ctx) noexcept { out.put(get()); Base::printItem(out,ctx); }
 
       operator std::decay_t<Type>&() noexcept             { return data; }
       operator const std::decay_t<Type>&() const noexcept { return data; }
@@ -182,6 +191,8 @@ namespace oneData {
 
       template<typename Out>
       void print(Out& out) const noexcept { out.put(data); Base::print(out); }
+      template<typename Out,typename Ctx>
+      void printItem(Out& out,Ctx& ctx) noexcept { out.put(data); Base::printItem(out,ctx); }
 
       operator const char*() const noexcept { return data; }
       operator       char*()       noexcept { return data; }
@@ -217,6 +228,8 @@ namespace oneData {
 
       template<typename Out>
       void print(Out& out) const noexcept { out.put(get()); Base::print(out); }
+      template<typename Out,typename Ctx>
+      void printItem(Out& out,Ctx& ctx) noexcept { out.put(get()); Base::printItem(out,ctx); }
 
       operator auto&() noexcept { return get(); }
       operator std::remove_cv_t<Type>() const noexcept { return get(); }
