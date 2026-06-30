@@ -30,9 +30,11 @@
 #ifdef __AVR__
   #include <string.h>
   #include <stdlib.h>
+  #include <stdint.h>
 #else
   #include <cstring>
   #include <cstdlib>
+  #include <cstdint>
 #endif
 #include <hapi/hapi.h>
 using hapi::APIOf;
