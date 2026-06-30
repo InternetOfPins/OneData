@@ -4,6 +4,8 @@
 
 Lightweight data components for **HAPI** and embedded systems.
 
+**HAPI Compatibility:** Updated for new Check/Apply/ApplyPack API (2026-Q2)
+
 Owned values, external references, compile-time constants, change tracking, value ranges, and default injection — all composable via `DataDef<>` with zero runtime overhead where the hardware allows it.
 
 ---
