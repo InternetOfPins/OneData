@@ -13,11 +13,13 @@
  *   DataFn            — external get()/set() functions (pins, ISR-shared vars, sensors)
  *   Translated        — bidirectional raw<->display value conversion
  *   ReadOnly          — erases set(), compile-time-enforced read-only view
+ *   Decimals          — fixed N-decimal-place print formatting
  *   DataDef           — composition closes chain
  */
 
 #include <iostream>
 #include <cassert>
+#include <cstring>
 #include <oneData/oneData.h>
 
 #ifdef ARDUINO
@@ -186,6 +188,42 @@ void test_translated_read_only_wrapper() {
   cout << "Translated<ReadOnly<DataFn<...>>>: ok" << endl;
 }
 
+struct StrOut {
+  char buf[64]{};
+  int len=0;
+  void put(char c) { if(len<63) { buf[len++]=c; buf[len]=0; } }
+  void put(long v) {
+    if(v<0) { put('-'); v=-v; }
+    char tmp[16]; int n=0;
+    if(v==0) tmp[n++]='0';
+    while(v>0) { tmp[n++]=(char)('0'+(v%10)); v/=10; }
+    while(n>0) put(tmp[--n]);
+  }
+  void put(int v) { put((long)v); }
+};
+
+void test_decimals() {
+  DataDef<Decimals<2,Data<float>>> d;
+  d.set(3.14159f);
+  StrOut out; int ctx=0;
+  d.printItem(out, ctx);
+  assert(strcmp(out.buf,"3.14")==0);
+
+  DataDef<Decimals<0,Data<float>>> d0;
+  d0.set(7.8f);
+  StrOut out0;
+  d0.printItem(out0, ctx);
+  assert(strcmp(out0.buf,"8")==0);   // rounds to nearest whole, carry handled at N=0 too
+
+  DataDef<Decimals<3,Data<float>>> d3;
+  d3.set(-1.5f);
+  StrOut out3;
+  d3.print(out3);
+  assert(strcmp(out3.buf,"-1.500")==0);
+
+  cout << "Decimals: ok" << endl;
+}
+
 void doTests() {
   test_data_int();
   test_data_bool();
@@ -200,6 +238,7 @@ void doTests() {
   test_translated_readonly();
   test_read_only();
   test_translated_read_only_wrapper();
+  test_decimals();
   cout << "all OneData tests passed" << endl;
 }
 

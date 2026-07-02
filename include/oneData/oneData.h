@@ -321,6 +321,52 @@ namespace oneData {
     };
   };
 
+  /// @brief fixed N-decimal-place print formatting for a floating-point W — first of what
+  /// should be a family of small, single-purpose numeric print preferences (width/padding,
+  /// sign display, etc. can each be their own sibling component later, same shape).
+  /// Same idiom as Translated: hijacks print()/printItem() instead of forwarding to Base's,
+  /// since it's replacing (not adding to) how the value is rendered. Digit extraction is done
+  /// manually (no snprintf/%f) so it works on AVR without needing printf float-support linked
+  /// in (-Wl,-u,vfprintf -lprintf_flt -lm), which isn't enabled by default.
+  template <unsigned N, typename W>
+  struct Decimals {
+    using Type = typename W::Type;
+    template <typename O>
+    struct Part : W::template Part<O> {
+      using Base = typename W::template Part<O>;
+      using Type = typename Base::Type;
+      using Base::Base;
+      using Base::get;
+      using Base::set;
+
+      template<typename Out>
+      void print(Out& out) const noexcept { put(out); }
+      template<typename Out,typename Ctx>
+      void printItem(Out& out,Ctx&) noexcept { put(out); }
+
+    private:
+      template<typename Out>
+      void put(Out& out) const noexcept {
+        Type v = get();
+        if (v < 0) { out.put('-'); v = -v; }
+        long scale = 1;
+        for (unsigned i=0; i<N; i++) scale *= 10;
+        long whole = (long)v;
+        long frac  = (long)((v - (Type)whole) * (Type)scale + (Type)0.5);
+        if (frac >= scale) { whole++; frac -= scale; }  // carry from rounding up
+        out.put(whole);
+        if constexpr (N > 0) {
+          out.put('.');
+          long div = scale/10;
+          for (unsigned i=0; i<N; i++) {
+            out.put((char)('0' + (frac/div)%10));
+            div /= 10;
+          }
+        }
+      }
+    };
+  };
+
   /// @brief erases set() from W — read-only view. Private-inherits W::Part<O> and re-exposes
   /// only get()/print()/printItem(); set() (and any mutable access) is simply not brought back
   /// into scope, so it's not just unused but genuinely inaccessible — anything above ReadOnly
