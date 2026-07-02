@@ -10,6 +10,9 @@
  *   NumRange          — runtime range up/down
  *   Default           — default value injection
  *   DataRef           — external variable reference
+ *   DataFn            — external get()/set() functions (pins, ISR-shared vars, sensors)
+ *   Translated        — bidirectional raw<->display value conversion
+ *   ReadOnly          — erases set(), compile-time-enforced read-only view
  *   DataDef           — composition closes chain
  */
 
@@ -128,6 +131,61 @@ void test_data_ref() {
   cout << "DataRef: ok" << endl;
 }
 
+struct FakePinSrc {
+  static inline int value = 0;
+  static int  get()      { return value; }
+  static void set(int v) { value = v; }
+};
+
+void test_data_fn() {
+  FakePinSrc::value = 42;
+  DataDef<DataFn<FakePinSrc>> d;
+  assert(d.get() == 42);
+  d.set(7);
+  assert(FakePinSrc::value == 7);
+  assert(d.get() == 7);
+  cout << "DataFn: ok" << endl;
+}
+
+struct AdcToVolts {
+  static constexpr float toDisplay(int raw) { return raw * (5.0f/1023.0f); }
+  static constexpr int   toRaw(float v)     { return (int)(v * 1023.0f/5.0f); }
+};
+
+void test_translated() {
+  DataDef<Translated<Watch<Default<Int,0>>,AdcToVolts>> d;
+  assert(d.get() == 0.0f);
+  assert(!d.changed());
+  d.set(2.5f);
+  assert(d.get() > 2.4f && d.get() < 2.6f);
+  assert(d.changed());           // Watch tracks the raw int below Translated; set() moved it off default
+  d.sync();
+  assert(!d.changed());
+  cout << "Translated: ok" << endl;
+}
+
+void test_translated_readonly() {
+  FakePinSrc::value = 512;
+  DataDef<Translated<DataFn<FakePinSrc>,AdcToVolts>> d;
+  assert(d.get() > 2.4f && d.get() < 2.6f);   // 512/1023*5 ~= 2.502
+  cout << "Translated (read-only, DataFn-backed): ok" << endl;
+}
+
+void test_read_only() {
+  DataDef<ReadOnly<Default<Int,42>>> d;
+  assert(d.get() == 42);
+  // d.set(7);  // would fail to compile: ReadOnly erases set()
+  cout << "ReadOnly<Default<Int,42>>: ok" << endl;
+}
+
+void test_translated_read_only_wrapper() {
+  FakePinSrc::value = 512;
+  DataDef<Translated<ReadOnly<DataFn<FakePinSrc>>,AdcToVolts>> d;
+  assert(d.get() > 2.4f && d.get() < 2.6f);
+  // d.set(2.5f);  // would fail to compile: erasure propagates through Translated
+  cout << "Translated<ReadOnly<DataFn<...>>>: ok" << endl;
+}
+
 void doTests() {
   test_data_int();
   test_data_bool();
@@ -137,6 +195,11 @@ void doTests() {
   test_num_range();
   test_default_value();
   test_data_ref();
+  test_data_fn();
+  test_translated();
+  test_translated_readonly();
+  test_read_only();
+  test_translated_read_only_wrapper();
   cout << "all OneData tests passed" << endl;
 }
 

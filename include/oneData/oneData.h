@@ -238,6 +238,33 @@ namespace oneData {
     };
   };
 
+  // DATA FN (External get/set Functions - Pins, ISR-shared vars, sensors...) ---
+  /// @brief storage backed by user get()/set() static functions instead of an owned value.
+  /// Src just needs `static Type get()` (and `static void set(Type)` if writable) — a pin
+  /// terminal (OnePin already exposes both, via Mask<>) works directly as Src with no
+  /// adapter; a hand-written struct works the same way for volatile globals, registers,
+  /// sensor reads, etc.
+  template <typename Src>
+  struct DataFn {
+    using Type = decltype(Src::get());
+    template <typename O>
+    struct Part : O {
+      using Base = O;
+      using Type = decltype(Src::get());
+      using Base::Base;
+
+      static Type get() noexcept { return Src::get(); }
+      static void set(Type v) noexcept { Src::set(v); }
+
+      template<typename Out>
+      void print(Out& out) const noexcept { out.put(get()); Base::print(out); }
+      template<typename Out,typename Ctx>
+      void printItem(Out& out,Ctx& ctx) noexcept { out.put(get()); Base::printItem(out,ctx); }
+
+      operator Type() const noexcept { return get(); }
+    };
+  };
+
   // SUGAR ALIASES --------------------------------------------------------------
   using Text = Data<const char *>;
   using Bool = Data<bool>;
@@ -261,6 +288,58 @@ namespace oneData {
 
       constexpr bool changed() const noexcept { return get() != watched; }
       void sync() noexcept { watched = get(); }
+    };
+  };
+
+  /// @brief bidirectional value conversion between an underlying raw storage W and a
+  /// displayed/edited Type (e.g. a 0-1023 ADC reading shown/edited as 0.0-5.0 volts).
+  /// Policy needs `static Display toDisplay(Raw)`; `static Raw toRaw(Display)` is only
+  /// required if the field is actually edited (set() called) — a read-only translated
+  /// field (no NumField/EditField above it) never instantiates set(), so a Policy with
+  /// only toDisplay is enough for a monitor-only field.
+  template <typename W, typename Policy>
+  struct Translated {
+    using Type = decltype(Policy::toDisplay(std::declval<typename W::Type>()));
+    template <typename O>
+    struct Part : W::template Part<O> {
+      using Base = typename W::template Part<O>;
+      using Type = decltype(Policy::toDisplay(std::declval<typename Base::Type>()));
+      using Base::Base;
+
+      Type get() const noexcept { return Policy::toDisplay(Base::get()); }
+      void set(Type v) noexcept { Base::set(Policy::toRaw(v)); }
+
+      // NOTE: deliberately does NOT forward to Base::print()/printItem() — Base
+      // eventually reaches a Data<T>/DataFn/DataRef terminal that would print the
+      // untranslated raw value too, double-printing (same class of bug fixed in
+      // TextField::PartEnd, see project history 2026-06-24). This is the sole
+      // print source for a translated field.
+      template<typename Out>
+      void print(Out& out) const noexcept { out.put(get()); }
+      template<typename Out,typename Ctx>
+      void printItem(Out& out,Ctx&) noexcept { out.put(get()); }
+    };
+  };
+
+  /// @brief erases set() from W — read-only view. Private-inherits W::Part<O> and re-exposes
+  /// only get()/print()/printItem(); set() (and any mutable access) is simply not brought back
+  /// into scope, so it's not just unused but genuinely inaccessible — anything above ReadOnly
+  /// that tries to call set() (e.g. StaticNumRange::up()/down(), which call set() internally)
+  /// fails to compile, catching "editable UI wired to a read-only value" at compile time.
+  template <typename W>
+  struct ReadOnly {
+    using Type = typename W::Type;
+    template <typename O>
+    struct Part : private W::template Part<O> {
+      using Base = typename W::template Part<O>;
+    public:
+      using Base::Base;
+      using Type = typename Base::Type;
+      using Base::get;
+      template<typename Out>
+      void print(Out& out) const noexcept { Base::print(out); }
+      template<typename Out,typename Ctx>
+      void printItem(Out& out,Ctx& ctx) noexcept { Base::printItem(out,ctx); }
     };
   };
 
