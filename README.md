@@ -21,6 +21,10 @@ Owned values, external references, compile-time constants, change tracking, valu
 | `NumRange<N>` | Dynamic value range with step/wrap | 3 × `sizeof(N)` + 1 |
 | `StaticNumRange<N, low, high>` | Compile-time range, clamp on step | 0 |
 | `Default<T, v>` | Default-value injection modifier | 0 |
+| `DataFn<Src>` | External `get()`/`set()` functions as storage (pins, ISR-shared vars, sensors) | 0 |
+| `Translated<W, Policy>` | Bidirectional raw↔display value conversion (e.g. ADC counts ↔ volts) | 0 |
+| `ReadOnly<W>` | Erases `set()` at compile time — genuine read-only view, not a silent no-op | 0 |
+| `Decimals<N, W>` | Fixed N-decimal-place print formatting, no libc float-printf needed | 0 |
 
 String aliases: `Text` (`Data<const char*>`), `Bool` (`Data<bool>`), `Int` (`Data<int>`).
 
@@ -88,6 +92,27 @@ gain.down(20); // 40
 
 ```cpp
 DataDef<Default<int, 128>, Int> mid; // initialises to 128 without passing a value
+```
+
+### Translated value (raw ADC counts shown as volts)
+
+```cpp
+struct MyAdcPin { static int get(); static void set(int); };  // or any OnePin terminal — get()/set() already match
+
+struct AdcToVolts {
+    static constexpr float toDisplay(int raw) { return raw * (5.0f/1023.0f); }
+    static constexpr int   toRaw(float v)     { return (int)(v * 1023.0f/5.0f); }  // omit if read-only
+};
+
+DataDef<Decimals<2, Translated<Watch<DataFn<MyAdcPin>>, AdcToVolts>>> sensor;
+sensor.get();     // "2.50" -style raw->volts conversion, formatted to 2 decimals when printed
+sensor.changed(); // tracks the raw int underneath Translated, not the lossy float
+```
+
+A read-only monitor (no editing) just needs a `Policy` with `toDisplay()` — `toRaw()` is never instantiated unless `set()` is actually called. Wrap with `ReadOnly<...>` for a compile-time-enforced guarantee instead of relying on that:
+
+```cpp
+DataDef<Translated<ReadOnly<DataFn<MyAdcPin>>, AdcToVolts>> sensor; // sensor.set(x) fails to compile
 ```
 
 ---
@@ -167,6 +192,34 @@ Compile-time variant. No stored state; `up()`/`down()` clamp via `constexpr` exp
 ### Default\<T, defaultValue\>
 
 Injects `defaultValue` as the first constructor argument to the layer below, so a `DataDef` can be constructed without explicitly providing an initial value.
+
+### DataFn\<Src\>
+
+Storage backed by external `get()`/`set()` static functions instead of an owned value. `Src` just needs `static Type get()` (and `static void set(Type)` if writable) — an OnePin terminal already exposes both (via `Mask<>`), so a pin works directly as `Src` with no adapter. A hand-written struct works the same way for volatile globals, hardware registers, sensor reads, etc.
+
+```cpp
+static Type get() noexcept; // Src::get()
+static void set(Type) noexcept; // Src::set(v)
+```
+
+### Translated\<W, Policy\>
+
+Bidirectional value conversion between an underlying raw storage `W` and a displayed/edited `Type` (e.g. a 0–1023 ADC reading shown/edited as 0.0–5.0 volts).
+
+```cpp
+static Type toDisplay(RawType) noexcept; // required on Policy
+static RawType toRaw(Type)     noexcept; // required on Policy only if set() is ever called
+```
+
+`toRaw()` is only required if the field is actually edited — a non-template member function of a class template is only instantiated when called, so a read-only `Policy` (no `toRaw`) is enough for a monitor-only field. Defines its own `print()`/`printItem()` (does not forward to `Base`'s) — `Base` eventually reaches a `Data`/`DataFn`/`DataRef` terminal that would print the untranslated raw value too, double-printing the same logical value at two representations.
+
+### ReadOnly\<W\>
+
+Erases `set()` from `W` via private inheritance, re-exposing only `get()`/`print()`/`printItem()`. Calling `set()` on a `ReadOnly`-wrapped chain is a genuine compile error ("is inaccessible within this context"), not a silent no-op. Does not re-expose `changed()`/`sync()` — `ReadOnly<Watch<...>>` would lose those too; compose the other way (`Watch<ReadOnly<...>>`) if you need both.
+
+### Decimals\<N, W\>
+
+Fixed N-decimal-place print formatting for a floating-point `W`. Hijacks `print()`/`printItem()` the same way `Translated` does — it's replacing, not adding to, how the value is rendered. Digit extraction is done manually (no `snprintf`/`%f`), so it works on AVR without needing printf float-support linked in (`-Wl,-u,vfprintf -lprintf_flt -lm`), which isn't enabled by default.
 
 ---
 
