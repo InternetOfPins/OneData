@@ -321,6 +321,27 @@ namespace oneData {
     };
   };
 
+  /// @brief linear-remap Policy for Translated — e.g. a 0-100 percent field driving a
+  /// 0-255 PWM duty cycle, replacing a runtime `analogWrite(pin, map(v,0,100,0,255))`
+  /// call at the write site with the transform living on the field itself. Same integer
+  /// truncation behavior as Arduino's map() (division on whatever Type the ranges are —
+  /// pass floating-point NTTPs if fractional precision is wanted).
+  template<auto inLo, auto inHi, auto outLo, auto outHi>
+  struct MapPolicy {
+    static constexpr auto toDisplay(decltype(inLo) v) noexcept {
+      return (v-inLo)*(outHi-outLo)/(inHi-inLo)+outLo;
+    }
+    static constexpr auto toRaw(decltype(outLo) v) noexcept {
+      return (v-outLo)*(inHi-inLo)/(outHi-outLo)+inLo;
+    }
+  };
+
+  /// @brief Translated<W, MapPolicy<...>> sugar — the ranges are compile-time NTTPs
+  /// ("static"), not runtime-configurable; that's deliberate, same static-only rule as
+  /// Row/Rows's own partition parameters.
+  template<auto inLo, auto inHi, auto outLo, auto outHi, typename W>
+  using MapRange = Translated<W, MapPolicy<inLo,inHi,outLo,outHi>>;
+
   /// @brief fixed N-decimal-place print formatting for a floating-point W — first of what
   /// should be a family of small, single-purpose numeric print preferences (width/padding,
   /// sign display, etc. can each be their own sibling component later, same shape).
