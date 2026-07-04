@@ -23,6 +23,7 @@ Owned values, external references, compile-time constants, change tracking, valu
 | `Default<T, v>` | Default-value injection modifier | 0 |
 | `DataFn<Src>` | External `get()`/`set()` functions as storage (pins, ISR-shared vars, sensors) | 0 |
 | `Translated<W, Policy>` | Bidirectional raw↔display value conversion (e.g. ADC counts ↔ volts) | 0 |
+| `MapRange<inLo,inHi,outLo,outHi, W>` | Compile-time linear remap sugar over `Translated` (e.g. 0-100 percent ↔ 0-255 PWM duty) | 0 |
 | `ReadOnly<W>` | Erases `set()` at compile time — genuine read-only view, not a silent no-op | 0 |
 | `Decimals<N, W>` | Fixed N-decimal-place print formatting, no libc float-printf needed | 0 |
 
@@ -114,6 +115,18 @@ A read-only monitor (no editing) just needs a `Policy` with `toDisplay()` — `t
 ```cpp
 DataDef<Translated<ReadOnly<DataFn<MyAdcPin>>, AdcToVolts>> sensor; // sensor.set(x) fails to compile
 ```
+
+### Linear remap (percent field driving a PWM duty cycle)
+
+```cpp
+// field is edited/displayed 0-100 (percent); underlying storage is 0-255 (PWM duty) —
+// replaces a runtime analogWrite(pin, map(v,0,100,0,255)) call at the write site.
+DataDef<MapRange<0,100,0,255, Watch<Default<Int,55>>>> ch1{};
+ch1.get();     // 140 (55 mapped from 0-100 into 0-255)
+ch1.set(255);  // writes 100 to the underlying Int
+```
+
+Ranges are compile-time NTTPs, not runtime-configurable — same integer-truncation behavior as Arduino's `map()`.
 
 ---
 
@@ -212,6 +225,15 @@ static RawType toRaw(Type)     noexcept; // required on Policy only if set() is 
 ```
 
 `toRaw()` is only required if the field is actually edited — a non-template member function of a class template is only instantiated when called, so a read-only `Policy` (no `toRaw`) is enough for a monitor-only field. Defines its own `print()`/`printItem()` (does not forward to `Base`'s) — `Base` eventually reaches a `Data`/`DataFn`/`DataRef` terminal that would print the untranslated raw value too, double-printing the same logical value at two representations.
+
+### MapRange\<inLo, inHi, outLo, outHi, W\>
+
+```cpp
+template<auto inLo, auto inHi, auto outLo, auto outHi, typename W>
+using MapRange = Translated<W, MapPolicy<inLo,inHi,outLo,outHi>>;
+```
+
+Sugar over `Translated`: `MapPolicy<...>` computes `toDisplay()`/`toRaw()` as a linear remap between `[inLo,inHi]` (`W`'s own value range) and `[outLo,outHi]` (the displayed/edited range), instead of a hand-written `Policy` struct. All four bounds are compile-time NTTPs — not runtime-configurable, by design (the same static-only rule OneMenu's `Row`/`Rows` layout partition parameters follow). Integer NTTPs truncate the same way Arduino's `map()` does; pass floating-point NTTPs for fractional precision.
 
 ### ReadOnly\<W\>
 
