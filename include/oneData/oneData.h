@@ -577,9 +577,19 @@ namespace oneData {
       }
       template<typename Out,typename Ctx>
       void printItem(Out& out,Ctx& ctx) noexcept {
+        // Only mirror+sync on a genuine draw pass (None=full, Update=partial) — Changed/Sync/
+        // Measure are zero-side-effect probes (see nav.h's changed(out): a Gate-suppressed
+        // printTo() dry-run just to ask "did anything change"). sync() isn't a hardware write,
+        // so Gate can't protect it the way it protects put()/nl() — calling it unconditionally
+        // here would consume/clear Watch's changed() flag during the probe itself, before the
+        // real redraw pass ever runs, so the real pass then sees changed()==false and the
+        // screen never visibly updates. Same class of bug as UseEditCursorFmt's own lockMode
+        // guard (formats.h) and the "Gate-suppressed-writes" bug class (see project memory).
+        auto lm = out.lockMode();
+        bool isDrawPass = (lm==decltype(lm)::None || lm==decltype(lm)::Update);
         if constexpr (_HasChanged<Base>::value) {
-          if (Base::changed()) { out.template btWrite<Id>(get()); Base::sync(); }
-        } else {
+          if (isDrawPass && Base::changed()) { out.template btWrite<Id>(get()); Base::sync(); }
+        } else if (isDrawPass) {
           out.template btWrite<Id>(get());
         }
         Base::printItem(out,ctx);
