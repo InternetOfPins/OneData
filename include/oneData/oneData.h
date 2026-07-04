@@ -529,5 +529,62 @@ namespace oneData {
     };
   };
 
+  // BTREC (BT/GATT record tag) --------------------------------------------------
+  /// @brief tags a data component with a BT record id; same composition shape as
+  /// Watch/Default (wraps W, doesn't touch nav). Mirrors the value out through
+  /// Out::btWrite<Id>() — picked up by a matching oneOutput::BtOut<Ble,Id> if one is
+  /// composed into the Out chain, a no-op (see OutAPI::btWrite) otherwise, so an
+  /// untagged/unwired field costs nothing.
+  ///
+  /// If W wraps Watch (i.e. has changed()/sync()), printItem() only mirrors+syncs when
+  /// changed() — avoids pushing/notifying on every redraw. Without Watch it mirrors
+  /// unconditionally. print() (the const, non-nav path) always mirrors unconditionally,
+  /// since it can't call a mutating sync().
+  ///
+  /// BTRec<Watch<Default<Data<int>,0>>, 3>  — composable freely, same as Watch/Default.
+  /// Only matters to keep W reference-backed (DataRef/DataFn) instead of owned (Data<T>)
+  /// when BT runs its own independent nav alongside another nav over the same field tree
+  /// — two navs both owning the same Data<T> would duplicate it. If BT is the only
+  /// output/nav, owned Data<T> is fine too; the constraint is about multi-nav sharing,
+  /// not BTRec itself. See project_bt_menu_output memory for the fuller nav discussion.
+  ///
+  /// Inbound direction (peer write -> set()) is NOT wired yet — reading back
+  /// Ble::char_written(Id)/char_read(Id,...) into set() needs a text/binary parse-back
+  /// story (see setStr() used elsewhere) and is deferred; see project_bt_menu_output memory.
+  template<typename W, uint16_t Id>
+  struct BTRec {
+    using Type = typename W::Type;
+    template <typename O>
+    struct Part : W::template Part<O> {
+      using Base = typename W::template Part<O>;
+      using Type = typename Base::Type;
+      using Base::Base;
+      using Base::get;
+      using Base::set;
+      static constexpr uint16_t btId = Id;
+
+    private:
+      template<typename T, typename = void>
+      struct _HasChanged : std::false_type {};
+      template<typename T>
+      struct _HasChanged<T, std::void_t<decltype(std::declval<T&>().changed())>> : std::true_type {};
+
+    public:
+      template<typename Out>
+      void print(Out& out) const noexcept {
+        out.template btWrite<Id>(get());
+        Base::print(out);
+      }
+      template<typename Out,typename Ctx>
+      void printItem(Out& out,Ctx& ctx) noexcept {
+        if constexpr (_HasChanged<Base>::value) {
+          if (Base::changed()) { out.template btWrite<Id>(get()); Base::sync(); }
+        } else {
+          out.template btWrite<Id>(get());
+        }
+        Base::printItem(out,ctx);
+      }
+    };
+  };
 
 }; // namespace oneData
