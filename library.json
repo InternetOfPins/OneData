@@ -23,6 +23,7 @@
   "license": "MIT",
   "homepage": "https://github.com/InternetOfPins/OneData",
   "dependencies": {
+    "HAPI": ">=0.4.1"
   },
   "frameworks": "*",
   "platforms": "*"
