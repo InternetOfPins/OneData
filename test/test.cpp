@@ -14,6 +14,7 @@
  *   Translated        — bidirectional raw<->display value conversion
  *   ReadOnly          — erases set(), compile-time-enforced read-only view
  *   Decimals          — fixed N-decimal-place print formatting
+ *   Printf            — printf-style print formatting via a compile-time format string
  *   DataDef           — composition closes chain
  */
 
@@ -224,6 +225,31 @@ void test_decimals() {
   cout << "Decimals: ok" << endl;
 }
 
+static constexpr CText fmt03{"%03d"};
+int printf_target=7; // DataRef<&...>'s NTTP needs static storage duration
+
+void test_printf() {
+  DataDef<Printf<&fmt03, DataRef<&printf_target>>> d;
+  StrOut out; int ctx=0;
+  d.printItem(out, ctx);
+  assert(strcmp(out.buf,"007")==0);
+
+  printf_target=42;
+  StrOut out2;
+  d.print(out2);
+  assert(strcmp(out2.buf,"042")==0);
+
+  // get()/set() must still forward to the wrapped DataRef unchanged
+  d.set(123);
+  assert(printf_target==123);
+  assert(d.get()==123);
+  StrOut out3;
+  d.print(out3);
+  assert(strcmp(out3.buf,"123")==0);   // 3-digit value, no leading zeros to show
+
+  cout << "Printf: ok" << endl;
+}
+
 void doTests() {
   test_data_int();
   test_data_bool();
@@ -239,6 +265,7 @@ void doTests() {
   test_read_only();
   test_translated_read_only_wrapper();
   test_decimals();
+  test_printf();
   cout << "all OneData tests passed" << endl;
 }
 

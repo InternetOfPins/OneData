@@ -31,10 +31,13 @@
   #include <string.h>
   #include <stdlib.h>
   #include <stdint.h>
+  #include <stdio.h>   // snprintf — Printf<fmt,W> below; avr-libc's default vfprintf
+                        // handles integer specifiers fine, no extra linking needed
 #else
   #include <cstring>
   #include <cstdlib>
   #include <cstdint>
+  #include <cstdio>
 #endif
 #include <hapi/hapi.h>
 using hapi::APIOf;
@@ -57,6 +60,48 @@ namespace oneData {
   };
 
   template <typename... OO> using DataDef = APIOf<DataAPI<>, OO...>;
+
+  /// @brief suppresses II...'s own print()/printItem() from the normal output chain,
+  /// redirecting both straight to whatever comes next (I) instead — e.g. wrap a
+  /// description/tooltip Data component in Hidden<...> to keep it out of the item's
+  /// normal visible rendering. Ctx is a template parameter (not any concrete type) —
+  /// print()/printItem() here are pure blind forwarding (I::print(out)/I::printItem(out,ctx)),
+  /// never inspecting ctx's value, so this compiles and behaves correctly for *any* Ctx,
+  /// not just one specific caller's notion of it.
+  ///
+  /// Deliberately narrow: this is only the data-chain half. A caller that also wants a
+  /// pull-based "render II... on demand" escape hatch (used by oneMenu for secondary/
+  /// footer-device content) or needs to route item-navigation calls (nav()) needs a
+  /// richer wrapper on top — those genuinely interpret their Ctx/Nav arguments (e.g.
+  /// oneMenu::Ctx::operator bool(), real path/selection semantics), unlike print/
+  /// printItem here, so they don't belong at this generic a level. See
+  /// oneMenu::Hidden<II...> (item.h), which derives its own Part<I> from this one and
+  /// adds exactly those two oneMenu-specific pieces on top — not a duplicate
+  /// implementation, the real split between what's genuinely data-generic and what
+  /// isn't.
+  template<typename... II>
+  struct Hidden {
+    struct End {
+      template<typename O>
+      struct Part:O {
+        using Base=O;
+        using Base::Base;
+        template<typename Out> static void print(Out&) noexcept {}
+        template<typename Out,typename Ctx> static void printItem(Out&,Ctx&) noexcept {}
+      };
+    };
+    template<typename I>
+    struct Part:hapi::Chain<II...,End>::template Part<I> {
+      using Base=typename hapi::Chain<II...,End>::template Part<I>;
+      using Base::Base;
+      // skip II... in flat output chain
+      template<typename Out>
+      void print(Out& out) const noexcept {I::print(out);}
+      // skip II... in printItem chain
+      template<typename Out,typename Ctx>
+      void printItem(Out& out,Ctx& ctx) noexcept {I::printItem(out,ctx);}
+    };
+  };
 
   // STATIC DATA (Compile-Time Constant - Flash/Immediate - 0 Bytes RAM) --------
   /// @brief StaticData<42> / StaticData<true> / StaticData<'A'> — 0 bytes RAM, Type from value
@@ -384,6 +429,53 @@ namespace oneData {
             div /= 10;
           }
         }
+      }
+    };
+  };
+
+  /// @brief printf-style print formatting for a wrapped Data-chain W (e.g. "%03d" for
+  /// leading-zero integers) — sibling of Decimals<N,W> in the same "numeric print
+  /// preference" family, for the case where a fixed decimal-place count isn't the
+  /// right tool and an arbitrary C format string is. fmt is a compile-time NTTP, not
+  /// a runtime argument: a string literal can't be a template parameter directly
+  /// (pre-C++20), so this uses the same pointer-to-pointer indirection StaticText<>/
+  /// MultiLangText::Of<> already use elsewhere in this file — declare a named
+  /// `static constexpr CText myFmt{"%03d"};` and pass `&myFmt`.
+  ///
+  /// Same idiom as Decimals/Translated: hijacks print()/printItem() instead of
+  /// forwarding to Base's, since it's replacing (not adding to) how the value is
+  /// rendered — Base would otherwise reach a Data<T>/DataFn/DataRef terminal that
+  /// prints the unformatted raw value too, double-printing.
+  ///
+  /// AVR CAVEAT: integer format specifiers (%d/%u/%x/%03d/...) work out of the box —
+  /// avr-libc's default (non-float) vfprintf handles them with no extra linking.
+  /// Floating-point specifiers (%f/%e/%g) additionally need
+  /// `-Wl,-u,vfprintf -lprintf_flt -lm` linked, which most AVR toolchain setups don't
+  /// enable by default (same reasoning Decimals<N,W> exists to sidestep entirely, via
+  /// manual digit extraction instead of snprintf/%f) — prefer Decimals<N,W> over
+  /// Printf<"%f",W> for AVR-safe fixed-decimal float printing.
+  template <const char* const* fmt_ptr, typename W, unsigned sz = 16>
+  struct Printf {
+    using Type = typename W::Type;
+    template <typename O>
+    struct Part : W::template Part<O> {
+      using Base = typename W::template Part<O>;
+      using Type = typename Base::Type;
+      using Base::Base;
+      using Base::get;
+      using Base::set;
+
+      template<typename Out>
+      void print(Out& out) const noexcept { put(out); }
+      template<typename Out,typename Ctx>
+      void printItem(Out& out,Ctx&) noexcept { put(out); }
+
+    private:
+      template<typename Out>
+      void put(Out& out) const noexcept {
+        char buf[sz];
+        snprintf(buf, sz, *fmt_ptr, get());
+        for (const char* p = buf; *p; ++p) out.put(*p);
       }
     };
   };
