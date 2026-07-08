@@ -189,10 +189,6 @@ namespace oneData {
 
       Type data{};
 
-      // template <typename V, typename... OO>
-      // constexpr Part(V&& val, OO&&... oo) noexcept
-      //     : Base{std::forward<OO>(oo)...}, data{std::forward<V>(val)} {}
-
       template <typename V, typename... OO>
       constexpr Part(V v, OO&&... oo) noexcept
           : Base{std::forward<OO>(oo)...}, data(static_cast<std::decay_t<Type>>(v)) {}
@@ -356,9 +352,8 @@ namespace oneData {
 
       // NOTE: deliberately does NOT forward to Base::print()/printItem() — Base
       // eventually reaches a Data<T>/DataFn/DataRef terminal that would print the
-      // untranslated raw value too, double-printing (same class of bug fixed in
-      // TextField::PartEnd, see project history 2026-06-24). This is the sole
-      // print source for a translated field.
+      // untranslated raw value too, double-printing. This is the sole print
+      // source for a translated field.
       template<typename Out>
       void print(Out& out) const noexcept { out.put(get()); }
       template<typename Out,typename Ctx>
