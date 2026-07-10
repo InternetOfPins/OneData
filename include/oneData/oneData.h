@@ -324,6 +324,11 @@ namespace oneData {
       using Base::Base;
       using Base::get;
       using Base::set;
+      using Base::sync;  // keep ItemAPI's inherited sync(Out&) template
+                         // reachable — this Part's own sync() (0-arg) would
+                         // otherwise hide it via ordinary C++ name hiding,
+                         // breaking IItem's virtual sync(IOut&) override
+                         // (item.h) for any chain built through IItemDef.
 
       std::remove_reference_t<Type> watched{};
 
