@@ -428,6 +428,63 @@ namespace oneData {
     };
   };
 
+  /// @brief like Decimals<N,W> but N is a *runtime* value, read live from a pointer
+  /// to an external integral variable (nPtr) at print time — not pushed via a
+  /// setter/event. Lets one field's edited value (e.g. a "decimal places" field)
+  /// control how a *different* field renders, without needing a value-changed event
+  /// dispatch (OneMenu's EventDispatch only fires Enter/Exit/Focus/Blur — no
+  /// "value changed" event exists to push through). Same AVR-safe manual
+  /// digit-extraction as Decimals<N,W>, N substituted at runtime via *nPtr.
+  /// changed()/sync() additionally track *nPtr's own last-seen value, so a redraw
+  /// fires even when only the *formatting* source changed, not the wrapped value
+  /// itself (mirrors Watch<W>'s own get()!=watched idiom, widened to a second
+  /// tracked value). Requires W to already compose Watch<> (for Base::changed()/
+  /// sync() to exist) — same implicit precondition Decimals<N,W> already has.
+  template <auto nPtr, typename W>
+  struct RuntimeDecimals {
+    using Type = typename W::Type;
+    template <typename O>
+    struct Part : W::template Part<O> {
+      using Base = typename W::template Part<O>;
+      using Type = typename Base::Type;
+      using Base::Base;
+      using Base::get;
+      using Base::set;
+
+      std::remove_reference_t<decltype(*nPtr)> lastN{*nPtr};
+
+      constexpr bool changed() const noexcept { return Base::changed() || *nPtr != lastN; }
+      void sync() noexcept { Base::sync(); lastN = *nPtr; }
+
+      template<typename Out>
+      void print(Out& out) const noexcept { put(out); }
+      template<typename Out,typename Ctx>
+      void printItem(Out& out,Ctx&) noexcept { put(out); }
+
+    private:
+      template<typename Out>
+      void put(Out& out) const noexcept {
+        Type v = get();
+        if (v < 0) { out.put('-'); v = -v; }
+        unsigned n = (unsigned)*nPtr;
+        long scale = 1;
+        for (unsigned i=0; i<n; i++) scale *= 10;
+        long whole = (long)v;
+        long frac  = (long)((v - (Type)whole) * (Type)scale + (Type)0.5);
+        if (frac >= scale) { whole++; frac -= scale; }  // carry from rounding up
+        out.put(whole);
+        if (n > 0) {
+          out.put('.');
+          long div = scale/10;
+          for (unsigned i=0; i<n; i++) {
+            out.put((char)('0' + (frac/div)%10));
+            div /= 10;
+          }
+        }
+      }
+    };
+  };
+
   /// @brief printf-style print formatting for a wrapped Data-chain W (e.g. "%03d" for
   /// leading-zero integers) — sibling of Decimals<N,W> in the same "numeric print
   /// preference" family, for the case where a fixed decimal-place count isn't the
