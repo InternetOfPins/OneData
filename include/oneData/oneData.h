@@ -548,6 +548,20 @@ namespace oneData {
   /// AVR-safe float printing). Not live-reread like RuntimeDecimals<nPtr,W> — the
   /// format string doesn't change while the program runs, only the wrapped value
   /// does, so there's no separate "format source changed" case to track.
+  ///
+  /// The forwarding constructor below matters beyond this component alone: any
+  /// component composed *before* this one in an outer chain (e.g. `ItemDef<
+  /// AsLabel<Text>, ..., NumField<Range,AsField<RuntimePrintf<W>>>, AsUnit<Text>,
+  /// ...>`) reaches its own real constructor by threading remaining brace-init
+  /// arguments hand-to-hand down through every intermediate `using Base::Base;`
+  /// level — hapi::Chain's constructor inheritance is flat across the WHOLE
+  /// composed chain, not "peel one arg per level" on its own. A component with
+  /// its OWN extra runtime arg (this one's `fmt`) MUST consume exactly its own
+  /// arg and forward the rest via `Base{...}`, or anything declared *later* in
+  /// the outer chain (like that `AsUnit<Text>`) loses its own path to its real
+  /// constructor entirely — confirmed via a real compile error the first time
+  /// this used a fixed single-arg constructor instead (no forwarding path),
+  /// composing this through `NumFieldDef` for `fieldFormat.ino`'s port.
   template <typename W, unsigned sz = 16>
   struct RuntimePrintf {
     using Type = typename W::Type;
