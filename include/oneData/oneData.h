@@ -537,6 +537,48 @@ namespace oneData {
     };
   };
 
+  /// @brief like Printf<fmt_ptr,W,sz> but fmt is a runtime const char*, fixed at
+  /// construction — for the case where the format string itself is a real runtime
+  /// value (e.g. supplied by the sketch author as a plain string literal argument),
+  /// not requiring the fmt_ptr pointer-to-pointer indirection Printf needs to work
+  /// around the "string literal isn't a legal NTTP" restriction. Same snprintf-
+  /// into-a-local-buffer rendering as Printf — same AVR caveat applies unchanged
+  /// (integer specifiers work with avr-libc's default vfprintf; float specifiers
+  /// need -Wl,-u,vfprintf -lprintf_flt -lm linked, prefer Decimals<N,W> instead for
+  /// AVR-safe float printing). Not live-reread like RuntimeDecimals<nPtr,W> — the
+  /// format string doesn't change while the program runs, only the wrapped value
+  /// does, so there's no separate "format source changed" case to track.
+  template <typename W, unsigned sz = 16>
+  struct RuntimePrintf {
+    using Type = typename W::Type;
+    template <typename O>
+    struct Part : W::template Part<O> {
+      using Base = typename W::template Part<O>;
+      using Type = typename Base::Type;
+      using Base::get;
+      using Base::set;
+
+      const char* fmt;
+
+      template<typename... Args>
+      constexpr Part(const char* f, Args&&... args)
+        : Base{std::forward<Args>(args)...}, fmt(f) {}
+
+      template<typename Out>
+      void print(Out& out) const noexcept { put(out); }
+      template<typename Out,typename Ctx>
+      void printItem(Out& out,Ctx&) noexcept { put(out); }
+
+    private:
+      template<typename Out>
+      void put(Out& out) const noexcept {
+        char buf[sz];
+        snprintf(buf, sz, fmt, get());
+        for (const char* p = buf; *p; ++p) out.put(*p);
+      }
+    };
+  };
+
   /// @brief erases set() from W — read-only view. Private-inherits W::Part<O> and re-exposes
   /// only get()/print()/printItem(); set() (and any mutable access) is simply not brought back
   /// into scope, so it's not just unused but genuinely inaccessible — anything above ReadOnly

@@ -250,6 +250,38 @@ void test_printf() {
   cout << "Printf: ok" << endl;
 }
 
+int runtime_printf_target=7; // separate storage from printf_target, same NTTP reason
+int other_runtime_printf_target=5; // DataRef<&...>'s NTTP needs static storage duration
+
+void test_runtime_printf() {
+  DataDef<RuntimePrintf<DataRef<&runtime_printf_target>>> d{"%03d"};
+  StrOut out; int ctx=0;
+  d.printItem(out, ctx);
+  assert(strcmp(out.buf,"007")==0);
+
+  runtime_printf_target=42;
+  StrOut out2;
+  d.print(out2);
+  assert(strcmp(out2.buf,"042")==0);
+
+  // get()/set() must still forward to the wrapped DataRef unchanged
+  d.set(123);
+  assert(runtime_printf_target==123);
+  assert(d.get()==123);
+  StrOut out3;
+  d.print(out3);
+  assert(strcmp(out3.buf,"123")==0);   // 3-digit value, no leading zeros to show
+
+  // a second instance with a DIFFERENT runtime fmt, same wrapped type — proves
+  // fmt is a real per-instance runtime value, not baked into the type
+  DataDef<RuntimePrintf<DataRef<&other_runtime_printf_target>>> d2{"%5d"};
+  StrOut out4;
+  d2.print(out4);
+  assert(strcmp(out4.buf,"    5")==0);
+
+  cout << "RuntimePrintf: ok" << endl;
+}
+
 void doTests() {
   test_data_int();
   test_data_bool();
@@ -266,6 +298,7 @@ void doTests() {
   test_translated_read_only_wrapper();
   test_decimals();
   test_printf();
+  test_runtime_printf();
   cout << "all OneData tests passed" << endl;
 }
 
