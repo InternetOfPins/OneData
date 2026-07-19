@@ -101,6 +101,27 @@ void test_static_num_range() {
   cout << "StaticNumRange<0,100> + wrap: ok" << endl;
 }
 
+void test_inv_dir() {
+  // default (false) — not inverted, up()/down() behave exactly like the
+  // plain StaticNumRange test above
+  DataDef<InvDir<StaticNumRange<StaticRange<0,100>>>, Int> plain{50};
+  plain.up();
+  assert(plain.get() == 51);
+  plain.down(); plain.down();
+  assert(plain.get() == 49);
+
+  // Inverted=true swaps which call increases vs decreases
+  DataDef<InvDir<StaticNumRange<StaticRange<0,100>>, true>, Int> inv{50};
+  inv.up();
+  assert(inv.get() == 49 && "InvDir<...,true>::up() must decrease");
+  inv.down(); inv.down();
+  assert(inv.get() == 51 && "InvDir<...,true>::down() must increase");
+  inv.up(10);
+  assert(inv.get() == 41 && "InvDir<...,true>::up(step) must decrease by step");
+
+  cout << "InvDir: ok" << endl;
+}
+
 void test_num_range() {
   DataDef<NumRange<int>, Int> r{0, 10, false, 5};
   assert(r.get() == 5);
@@ -289,6 +310,7 @@ void doTests() {
   test_watch();
   test_static_num_range();
   test_num_range();
+  test_inv_dir();
   test_default_value();
   test_data_ref();
   test_data_fn();

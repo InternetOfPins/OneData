@@ -593,6 +593,49 @@ namespace oneData {
     };
   };
 
+  /// @brief swaps which physical key increases vs decreases a wrapped
+  /// range's value — wraps anything exposing up(step)/down(step) (e.g.
+  /// StaticNumRange<...>/NumRange<T>) and forwards to the OTHER one when
+  /// `Inverted` is true. Default `false` (not inverted) is a deliberate
+  /// choice, not an arbitrary one: it matches AM4's own real shipped
+  /// default (`config::invertFieldKeys = false`, confirmed against AM4's
+  /// actual source — `menuBase.cpp`'s `Menu::defaultOptions` — the
+  /// `config` struct's own constructor default of `true` is overridden
+  /// there) — natural direction, consistent with plain (non-edit-mode)
+  /// Up/Down semantics elsewhere in this codebase. AM4's own comment on
+  /// the equivalent code ("by default they are inverted.. now buttons and
+  /// joystick have to flip them") suggests the inverted case exists to
+  /// compensate for specific input devices (e.g. a rotary encoder whose
+  /// physical rotation sense doesn't match logical up/down), not as a
+  /// universal default. Compose `InvDir<Range,true>` in place of a plain
+  /// `Range` (e.g. `NumField<InvDir<StaticNumRange<...>,true>,
+  /// AsField<...>>`) to opt into the flipped direction for a specific
+  /// field.
+  template <typename W, bool Inverted = false>
+  struct InvDir {
+    // No outer `using Type = typename W::Type;` — W here is a Range-shaped
+    // component (StaticNumRange<...>/NumRange<T>), which itself has no
+    // outer Type either (only its own nested Part<O> does, matching
+    // whatever it wraps); Type is only ever needed inside Part<O> below.
+    template <typename O>
+    struct Part : W::template Part<O> {
+      using Base = typename W::template Part<O>;
+      using Type = typename Base::Type;
+      using Base::Base;
+      using Base::get;
+      using Base::set;
+      using Base::valid;
+      using Base::clamp;
+
+      void up(Type step = 1) noexcept {
+        if constexpr (Inverted) Base::down(step); else Base::up(step);
+      }
+      void down(Type step = 1) noexcept {
+        if constexpr (Inverted) Base::up(step); else Base::down(step);
+      }
+    };
+  };
+
   /// @brief erases set() from W — read-only view. Private-inherits W::Part<O> and re-exposes
   /// only get()/print()/printItem(); set() (and any mutable access) is simply not brought back
   /// into scope, so it's not just unused but genuinely inaccessible — anything above ReadOnly
