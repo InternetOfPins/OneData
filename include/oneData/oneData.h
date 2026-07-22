@@ -751,6 +751,12 @@ namespace oneData {
       static constexpr Type clamp(Type v) noexcept {
         return RangeDesc::template clamp<Type>(v);
       }
+      // Plain value accessors (no formatting/rendering concern — OneData
+      // must never depend on OneMenu, see the dependency map memory) so a
+      // higher layer (oneMenu::NumField) can expose the field's own range
+      // for real client-facing rendering (e.g. a web slider's min/max).
+      static constexpr Type low() noexcept { return RangeDesc::template low<Type>(); }
+      static constexpr Type high() noexcept { return RangeDesc::template high<Type>(); }
 
       void up(Type step=1) noexcept {
         set(RangeDesc::template stepUp<Type>(get(), step));
