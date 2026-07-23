@@ -1,5 +1,7 @@
 # OneData
 
+<img src="logo.png" alt="OneData logo" width="64" height="64">
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Lightweight data components for **HAPI** and embedded systems.
