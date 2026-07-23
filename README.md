@@ -1,6 +1,4 @@
-# OneData
-
-<img src="logo.png" alt="OneData logo" width="64" height="64">
+# <img src="logo.png" alt="OneData logo" width="32" height="32"> OneData
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
