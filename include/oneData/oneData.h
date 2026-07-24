@@ -366,6 +366,46 @@ namespace oneData {
     };
   };
 
+  /// @brief bidirectional value conversion like Translated, but the translation is two
+  /// free functions supplied directly as NTTPs instead of a named Policy type — handy
+  /// for a one-off translation that doesn't warrant naming a Policy struct. Trans is
+  /// self-contained (not implemented on top of Translated): Trans<getFn,setFn>::Value<W>
+  /// ::Part<O> is the base component itself.
+  /// getFn(Raw)->Display is applied on get(), setFn(Display)->Raw is applied before
+  /// Base::set() — both are mandatory NTTPs, no display-only default: the user supplies
+  /// whatever setFn they mean (their own passthrough lambda included). If getFn/setFn
+  /// don't round-trip through compatible types, that's a hard compiler error at the
+  /// Base::set(setFn(v)) call site — no static_assert cushioning it. For a field that
+  /// must be genuinely non-writable, compose with the existing ReadOnly<W>, which erases
+  /// set() outright — that's its job, Trans doesn't need to reinvent it.
+  /// NOTE: template parameters are named getFn/setFn, not get/set — a nested Part<O>
+  /// member literally named get()/set() would shadow an enclosing template parameter of
+  /// the same name (a hard compile error), so the two must differ.
+  template <auto getFn, auto setFn>
+  struct Trans {
+    template <typename W>
+    struct Value {
+      using Type = decltype(getFn(std::declval<typename W::Type>()));
+      template <typename O>
+      struct Part : W::template Part<O> {
+        using Base = typename W::template Part<O>;
+        using Type = decltype(getFn(std::declval<typename Base::Type>()));
+        using Base::Base;
+
+        Type get() const noexcept { return getFn(Base::get()); }
+        void set(Type v) noexcept { Base::set(setFn(v)); }
+
+        // NOTE: deliberately does NOT forward to Base::print()/printItem() — same
+        // reasoning as Translated: Base eventually reaches a raw terminal that would
+        // double-print the untranslated value.
+        template<typename Out>
+        void print(Out& out) const noexcept { out.put(get()); }
+        template<typename Out,typename Ctx>
+        void printItem(Out& out,Ctx&) noexcept { out.put(get()); }
+      };
+    };
+  };
+
   /// @brief linear-remap Policy for Translated — e.g. a 0-100 percent field driving a
   /// 0-255 PWM duty cycle, replacing a runtime `analogWrite(pin, map(v,0,100,0,255))`
   /// call at the write site with the transform living on the field itself. Same integer

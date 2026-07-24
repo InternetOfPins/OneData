@@ -12,6 +12,7 @@
  *   DataRef           — external variable reference
  *   DataFn            — external get()/set() functions (pins, ISR-shared vars, sensors)
  *   Translated        — bidirectional raw<->display value conversion
+ *   Trans             — like Translated, but the Policy is two mandatory NTTP functions
  *   ReadOnly          — erases set(), compile-time-enforced read-only view
  *   Decimals          — fixed N-decimal-place print formatting
  *   Printf            — printf-style print formatting via a compile-time format string
@@ -188,6 +189,29 @@ void test_translated() {
   cout << "Translated: ok" << endl;
 }
 
+constexpr float adcToVolts(int raw) { return raw * (5.0f/1023.0f); }
+constexpr int voltsToAdc(float v) { return (int)(v * 1023.0f/5.0f); }
+
+void test_trans() {
+  DataDef<Trans<adcToVolts,voltsToAdc>::Value<Watch<Default<Int,0>>>> d;
+  assert(d.get() == 0.0f);
+  assert(!d.changed());
+  d.set(2.5f);
+  assert(d.get() > 2.4f && d.get() < 2.6f);
+  assert(d.changed());           // Watch tracks the raw int below Trans; set() moved it off default
+  d.sync();
+  assert(!d.changed());
+  cout << "Trans: ok" << endl;
+}
+
+void test_trans_readonly() {
+  FakePinSrc::value = 512;
+  DataDef<ReadOnly<Trans<adcToVolts,voltsToAdc>::Value<DataFn<FakePinSrc>>>> d;
+  assert(d.get() > 2.4f && d.get() < 2.6f);   // 512/1023*5 ~= 2.502
+  // d.set(2.5f);  // would fail to compile: ReadOnly erases set()
+  cout << "ReadOnly<Trans<...>>: ok" << endl;
+}
+
 void test_translated_readonly() {
   FakePinSrc::value = 512;
   DataDef<Translated<DataFn<FakePinSrc>,AdcToVolts>> d;
@@ -315,6 +339,8 @@ void doTests() {
   test_data_ref();
   test_data_fn();
   test_translated();
+  test_trans();
+  test_trans_readonly();
   test_translated_readonly();
   test_read_only();
   test_translated_read_only_wrapper();
