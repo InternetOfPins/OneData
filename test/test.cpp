@@ -16,6 +16,7 @@
  *   ReadOnly          — erases set(), compile-time-enforced read-only view
  *   Decimals          — fixed N-decimal-place print formatting
  *   Printf            — printf-style print formatting via a compile-time format string
+ *   IdText/FlashLangSrc — id-indexed multilingual text, MultiLangText::current-coordinated
  *   DataDef           — composition closes chain
  */
 
@@ -246,6 +247,7 @@ struct StrOut {
     while(n>0) put(tmp[--n]);
   }
   void put(int v) { put((long)v); }
+  void put(const char* s) { while(*s) put(*s++); }
 };
 
 void test_decimals() {
@@ -327,6 +329,31 @@ void test_runtime_printf() {
   cout << "RuntimePrintf: ok" << endl;
 }
 
+static const char* const idtext_en[] = {"Zero","One","Two"};
+static const char* const idtext_pt[] = {"Zero","Um","Dois"};
+static const char* const* const idtext_table[] = {idtext_en, idtext_pt};
+using IdTextSrc = FlashLangSrc<idtext_table, 2>;
+
+void test_id_text() {
+  MultiLangText::current = 0;
+  DataDef<IdText<1,IdTextSrc>> d;
+  assert(strcmp(d.get(),"One")==0);
+  StrOut out; int ctx=0;
+  d.printItem(out, ctx);
+  assert(strcmp(out.buf,"One")==0);
+
+  // same component instance, flipping the ONE shared selector alone must
+  // change what it resolves to — no per-instance state anywhere
+  MultiLangText::current = 1;
+  assert(strcmp(d.get(),"Um")==0);
+  StrOut out2;
+  d.print(out2);
+  assert(strcmp(out2.buf,"Um")==0);
+
+  MultiLangText::current = 0;  // restore default for any tests that run after
+  cout << "IdText/FlashLangSrc: ok" << endl;
+}
+
 void doTests() {
   test_data_int();
   test_data_bool();
@@ -347,6 +374,7 @@ void doTests() {
   test_decimals();
   test_printf();
   test_runtime_printf();
+  test_id_text();
   cout << "all OneData tests passed" << endl;
 }
 

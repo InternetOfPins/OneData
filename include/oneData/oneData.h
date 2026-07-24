@@ -176,6 +176,53 @@ namespace oneData {
     };
   };
 
+  /// @brief central compile-time language table, id-indexed: table[lang][id].
+  /// Zero RAM, zero runtime cost — a direct evolution of MultiLangText::Of's
+  /// own array-NTTP idiom one level deeper (id-indexed via one shared table
+  /// instead of one array per field). The only viable IdText::Src for
+  /// targets with no filesystem (plain AVR/STM32); a filesystem-backed Src
+  /// (SPIFFS, for ESP8266/ESP32 targets that want to avoid duplicating the
+  /// same strings in flash and on the filesystem) is a separate, not yet
+  /// built Src implementation — the one-function Src contract doesn't need
+  /// to change to add it.
+  template<const char* const* const* table, int nLangs>
+  struct FlashLangSrc {
+    static const char* text(int id, uint8_t lang) noexcept {
+      return table[lang < nLangs ? lang : 0][id];
+    }
+  };
+
+  /// @brief id-indexed multilingual text, coordinated by MultiLangText's own
+  /// shared selector (MultiLangText::current) — the SAME selector Of<texts>
+  /// already uses, so switching language once affects every IdText and every
+  /// Of<texts> field in the program together. Unlike Of<texts> (which takes
+  /// its field's own per-language array directly as an NTTP), IdText takes
+  /// only a small integer id and looks the string up via Src — mirrors
+  /// DataFn<Src>'s own "one static function on Src" idiom: Src just needs
+  /// `static const char* text(int id, uint8_t lang) noexcept`, so a new
+  /// backend (SPIFFS-file-backed, EEPROM-backed, ...) slots in later with
+  /// zero change to IdText itself. See oneMenu::IdText (item.h), which
+  /// derives its own Part<I> from this one and adds the web-format
+  /// (XmlFmt/JsonFmt) "emit the bare id instead of resolved text" behavior
+  /// on top — same split as oneData::Hidden / oneMenu::Hidden.
+  template<int id, typename Src>
+  struct IdText {
+    using Type = const char*;
+    template<typename O>
+    struct Part : O {
+      using Base = O;
+      using Type = const char*;
+      using Base::Base;
+
+      static const char* get() noexcept { return Src::text(id, MultiLangText::current); }
+
+      template<typename Out>
+      void print(Out& out) const noexcept { out.put(get()); Base::print(out); }
+      template<typename Out,typename Ctx>
+      void printItem(Out& out,Ctx& ctx) noexcept { out.put(get()); Base::printItem(out,ctx); }
+    };
+  };
+
   // DATA (Owned RAM Storage) ---------------------------------------------------
   /// @brief mutable value with RAM storage; get() returns reference, set() writes, print() emits to output
   template <typename T>
