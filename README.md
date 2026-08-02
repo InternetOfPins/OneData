@@ -17,7 +17,8 @@ Owned values, external references, compile-time constants, change tracking, valu
 | `Data<T>` | Owned runtime value | `sizeof(T)` |
 | `StaticData<T, v>` | Compile-time immutable constant | 0 |
 | `DataRef<T*, &var>` | Reference to external variable or hardware register | 0 |
-| `Watch<W>` | Change-detection modifier wrapping any data component | `sizeof(T)` |
+| `Watch<W>` | Change-detection modifier wrapping any data component (value-diff) | `sizeof(T)` |
+| `Dirty<W>` | Change-detection modifier wrapping any data component (write-flag) | `sizeof(bool)` |
 | `NumRange<N>` | Dynamic value range with step/wrap | 3 × `sizeof(N)` + 1 |
 | `StaticNumRange<N, low, high>` | Compile-time range, clamp on step | 0 |
 | `Default<T, v>` | Default-value injection modifier | 0 |
@@ -181,6 +182,17 @@ void sync()          noexcept; // watched = get()
 ```
 
 `Watch` delegates `get()`, `set()`, and constructors to `W`.
+
+### Dirty\<W\>
+
+Wraps another data component `W` and tracks whether `set()` has been called since the last `sync()` — a literal write-flag, not a value comparison. Writing the same value back still counts as changed (unlike `Watch<W>`), and it costs one `bool` regardless of `W`'s `Type` size instead of a full extra copy. Matches upstream AM4's real `prompt::dirty` semantics; `compat/am4.h`'s `FIELD()` macro uses this instead of `Watch<W>` for that reason. Starts dirty (`true`) — a field needs its first draw regardless of what its initial value happens to be.
+
+```cpp
+bool changed() const noexcept; // true if set() has run since the last sync()
+void sync()          noexcept; // clears the flag
+```
+
+`Dirty` delegates `get()` and constructors to `W`; unlike `Watch`, it intercepts `set()` itself (forwarding to `W::set()`) rather than re-exposing it, since it has to flag the write.
 
 ### NumRange\<N\>
 
