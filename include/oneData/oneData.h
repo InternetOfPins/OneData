@@ -384,6 +384,48 @@ namespace oneData {
     };
   };
 
+  /// @brief change-tracking modifier: changed() returns true after any set() since the last
+  /// sync() — a literal dirty bit (flags every write, not a value-diff like Watch<> above).
+  /// Matches upstream AM4's real prompt::dirty semantics exactly (a plain bool, flipped on
+  /// write, never compared against a stored old value) — writing the SAME value back still
+  /// counts as a change, unlike Watch<>. Cheaper too: one bool regardless of Type's size,
+  /// vs. Watch<>'s full extra copy of Type. Intended for AM4-ported fields (compat/am4.h's
+  /// own field codegen macro uses this, not Watch<>, to match real AM4 behavior) — available
+  /// for hand-written OneMenu fields too, as an explicit per-field tradeoff (Watch<>'s exact
+  /// value-diff still avoids redundant redraws on a write-back-same-value; Dirty<> doesn't).
+  template <typename W>
+  struct Dirty {
+    using Type = typename W::Type;
+    template <typename O>
+    struct Part : W::template Part<O> {
+      using Base = typename W::template Part<O>;
+      using Type = typename Base::Type;
+      using Base::Base;
+      using Base::get;
+      using Base::sync;  // keep ItemAPI's inherited sync(Out&) template reachable — same
+                         // reason as Watch<>'s own identical line just above: this Part's
+                         // own sync() (0-arg) would otherwise hide it via name hiding.
+
+      // Starts dirty — matches AM4's prompt::dirty{true} "needs first draw", and unlike
+      // Watch<>'s watched{} default-init, this is correct regardless of what the wrapped
+      // value's own initial state happens to be (Watch<> only starts "changed" if the
+      // real initial value happens to differ from Type's default-constructed value).
+      bool m_dirty{true};
+
+      // Must actually intercept set() (Watch<> doesn't — it just re-exposes Base::set and
+      // compares lazily in changed()) — templated+forwarding so this one signature works
+      // uniformly against every real set() shape in this file: Data<T>'s own templated
+      // forwarding-ref set(V&&), and DataRef<>/DataFn<>'s static void set(Type). Can't be
+      // static itself even when wrapping a static Base::set — it has to touch per-instance
+      // m_dirty; ordinary name-hiding picks this non-static override over a static base one.
+      template<typename V>
+      void set(V&& v) noexcept { Base::set(std::forward<V>(v)); m_dirty=true; }
+
+      constexpr bool changed() const noexcept { return m_dirty; }
+      void sync() noexcept { m_dirty=false; }
+    };
+  };
+
   /// @brief bidirectional value conversion between an underlying raw storage W and a
   /// displayed/edited Type (e.g. a 0-1023 ADC reading shown/edited as 0.0-5.0 volts).
   /// Policy needs `static Display toDisplay(Raw)`; `static Raw toRaw(Display)` is only
