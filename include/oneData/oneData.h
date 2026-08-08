@@ -61,24 +61,7 @@ namespace oneData {
 
   template <typename... OO> using DataDef = APIOf<DataAPI<>, OO...>;
 
-  /// @brief suppresses II...'s own print()/printItem() from the normal output chain,
-  /// redirecting both straight to whatever comes next (I) instead — e.g. wrap a
-  /// description/tooltip Data component in Hidden<...> to keep it out of the item's
-  /// normal visible rendering. Ctx is a template parameter (not any concrete type) —
-  /// print()/printItem() here are pure blind forwarding (I::print(out)/I::printItem(out,ctx)),
-  /// never inspecting ctx's value, so this compiles and behaves correctly for *any* Ctx,
-  /// not just one specific caller's notion of it.
-  ///
-  /// Deliberately narrow: this is only the data-chain half. A caller that also wants a
-  /// pull-based "render II... on demand" escape hatch (used by oneMenu for secondary/
-  /// footer-device content) or needs to route item-navigation calls (nav()) needs a
-  /// richer wrapper on top — those genuinely interpret their Ctx/Nav arguments (e.g.
-  /// oneMenu::Ctx::operator bool(), real path/selection semantics), unlike print/
-  /// printItem here, so they don't belong at this generic a level. See
-  /// oneMenu::Hidden<II...> (item.h), which derives its own Part<I> from this one and
-  /// adds exactly those two oneMenu-specific pieces on top — not a duplicate
-  /// implementation, the real split between what's genuinely data-generic and what
-  /// isn't.
+  /// Suppresses II...'s own print()/printItem(), redirecting both to whatever comes next (I).
   template<typename... II>
   struct Hidden {
     struct End {
@@ -176,15 +159,7 @@ namespace oneData {
     };
   };
 
-  /// @brief central compile-time language table, id-indexed: table[lang][id].
-  /// Zero RAM, zero runtime cost — a direct evolution of MultiLangText::Of's
-  /// own array-NTTP idiom one level deeper (id-indexed via one shared table
-  /// instead of one array per field). The only viable IdText::Src for
-  /// targets with no filesystem (plain AVR/STM32); a filesystem-backed Src
-  /// (SPIFFS, for ESP8266/ESP32 targets that want to avoid duplicating the
-  /// same strings in flash and on the filesystem) is a separate, not yet
-  /// built Src implementation — the one-function Src contract doesn't need
-  /// to change to add it.
+  /// Compile-time language table, id-indexed: table[lang][id]. Zero RAM, zero runtime cost.
   template<const char* const* const* table, int nLangs>
   struct FlashLangSrc {
     static const char* text(int id, uint8_t lang) noexcept {
@@ -192,19 +167,8 @@ namespace oneData {
     }
   };
 
-  /// @brief id-indexed multilingual text, coordinated by MultiLangText's own
-  /// shared selector (MultiLangText::current) — the SAME selector Of<texts>
-  /// already uses, so switching language once affects every IdText and every
-  /// Of<texts> field in the program together. Unlike Of<texts> (which takes
-  /// its field's own per-language array directly as an NTTP), IdText takes
-  /// only a small integer id and looks the string up via Src — mirrors
-  /// DataFn<Src>'s own "one static function on Src" idiom: Src just needs
-  /// `static const char* text(int id, uint8_t lang) noexcept`, so a new
-  /// backend (SPIFFS-file-backed, EEPROM-backed, ...) slots in later with
-  /// zero change to IdText itself. See oneMenu::IdText (item.h), which
-  /// derives its own Part<I> from this one and adds the web-format
-  /// (XmlFmt/JsonFmt) "emit the bare id instead of resolved text" behavior
-  /// on top — same split as oneData::Hidden / oneMenu::Hidden.
+  /// Id-indexed multilingual text, resolved via Src::text(id, lang); language shared
+  /// with MultiLangText::current. Src requires `static const char* text(int id, uint8_t lang)`.
   template<int id, typename Src>
   struct IdText {
     using Type = const char*;
@@ -327,11 +291,8 @@ namespace oneData {
   };
 
   // DATA FN (External get/set Functions - Pins, ISR-shared vars, sensors...) ---
-  /// @brief storage backed by user get()/set() static functions instead of an owned value.
-  /// Src just needs `static Type get()` (and `static void set(Type)` if writable) — a pin
-  /// terminal (OnePin already exposes both, via Mask<>) works directly as Src with no
-  /// adapter; a hand-written struct works the same way for volatile globals, registers,
-  /// sensor reads, etc.
+  /// Storage backed by user get()/set() static functions instead of an owned value.
+  /// Src requires `static Type get()` (and `static void set(Type)` if writable).
   template <typename Src>
   struct DataFn {
     using Type = decltype(Src::get());
@@ -384,15 +345,8 @@ namespace oneData {
     };
   };
 
-  /// @brief change-tracking modifier: changed() returns true after any set() since the last
-  /// sync() — a literal dirty bit (flags every write, not a value-diff like Watch<> above).
-  /// Matches upstream AM4's real prompt::dirty semantics exactly (a plain bool, flipped on
-  /// write, never compared against a stored old value) — writing the SAME value back still
-  /// counts as a change, unlike Watch<>. Cheaper too: one bool regardless of Type's size,
-  /// vs. Watch<>'s full extra copy of Type. Intended for AM4-ported fields (compat/am4.h's
-  /// own field codegen macro uses this, not Watch<>, to match real AM4 behavior) — available
-  /// for hand-written OneMenu fields too, as an explicit per-field tradeoff (Watch<>'s exact
-  /// value-diff still avoids redundant redraws on a write-back-same-value; Dirty<> doesn't).
+  /// Change-tracking modifier: changed() returns true after any set() since the last sync()
+  /// (a dirty bit, not a value-diff — writing back the same value still counts as changed).
   template <typename W>
   struct Dirty {
     using Type = typename W::Type;
@@ -426,12 +380,9 @@ namespace oneData {
     };
   };
 
-  /// @brief bidirectional value conversion between an underlying raw storage W and a
-  /// displayed/edited Type (e.g. a 0-1023 ADC reading shown/edited as 0.0-5.0 volts).
-  /// Policy needs `static Display toDisplay(Raw)`; `static Raw toRaw(Display)` is only
-  /// required if the field is actually edited (set() called) — a read-only translated
-  /// field (no NumField/EditField above it) never instantiates set(), so a Policy with
-  /// only toDisplay is enough for a monitor-only field.
+  /// Bidirectional value conversion between raw storage W and a displayed/edited Type.
+  /// Policy requires `static Display toDisplay(Raw)`; `static Raw toRaw(Display)` is only
+  /// needed if the field is edited (set() called).
   template <typename W, typename Policy>
   struct Translated {
     using Type = decltype(Policy::toDisplay(std::declval<typename W::Type>()));
@@ -455,21 +406,9 @@ namespace oneData {
     };
   };
 
-  /// @brief bidirectional value conversion like Translated, but the translation is two
-  /// free functions supplied directly as NTTPs instead of a named Policy type — handy
-  /// for a one-off translation that doesn't warrant naming a Policy struct. Trans is
-  /// self-contained (not implemented on top of Translated): Trans<getFn,setFn>::Value<W>
-  /// ::Part<O> is the base component itself.
-  /// getFn(Raw)->Display is applied on get(), setFn(Display)->Raw is applied before
-  /// Base::set() — both are mandatory NTTPs, no display-only default: the user supplies
-  /// whatever setFn they mean (their own passthrough lambda included). If getFn/setFn
-  /// don't round-trip through compatible types, that's a hard compiler error at the
-  /// Base::set(setFn(v)) call site — no static_assert cushioning it. For a field that
-  /// must be genuinely non-writable, compose with the existing ReadOnly<W>, which erases
-  /// set() outright — that's its job, Trans doesn't need to reinvent it.
-  /// NOTE: template parameters are named getFn/setFn, not get/set — a nested Part<O>
-  /// member literally named get()/set() would shadow an enclosing template parameter of
-  /// the same name (a hard compile error), so the two must differ.
+  /// Bidirectional value conversion like Translated, but getFn/setFn are supplied directly
+  /// as NTTPs instead of a named Policy type. Both are mandatory; getFn(Raw)->Display is
+  /// applied on get(), setFn(Display)->Raw is applied before Base::set().
   template <auto getFn, auto setFn>
   struct Trans {
     template <typename W>
@@ -495,11 +434,7 @@ namespace oneData {
     };
   };
 
-  /// @brief linear-remap Policy for Translated — e.g. a 0-100 percent field driving a
-  /// 0-255 PWM duty cycle, replacing a runtime `analogWrite(pin, map(v,0,100,0,255))`
-  /// call at the write site with the transform living on the field itself. Same integer
-  /// truncation behavior as Arduino's map() (division on whatever Type the ranges are —
-  /// pass floating-point NTTPs if fractional precision is wanted).
+  /// Linear-remap Policy for Translated, mapping [inLo,inHi] to [outLo,outHi].
   template<auto inLo, auto inHi, auto outLo, auto outHi>
   struct MapPolicy {
     static constexpr auto toDisplay(decltype(inLo) v) noexcept {
@@ -510,19 +445,12 @@ namespace oneData {
     }
   };
 
-  /// @brief Translated<W, MapPolicy<...>> sugar — the ranges are compile-time NTTPs
-  /// ("static"), not runtime-configurable; that's deliberate, same static-only rule as
-  /// Row/Rows's own partition parameters.
+  /// Translated<W, MapPolicy<...>> sugar; ranges are compile-time NTTPs, not runtime-configurable.
   template<auto inLo, auto inHi, auto outLo, auto outHi, typename W>
   using MapRange = Translated<W, MapPolicy<inLo,inHi,outLo,outHi>>;
 
-  /// @brief fixed N-decimal-place print formatting for a floating-point W — first of what
-  /// should be a family of small, single-purpose numeric print preferences (width/padding,
-  /// sign display, etc. can each be their own sibling component later, same shape).
-  /// Same idiom as Translated: hijacks print()/printItem() instead of forwarding to Base's,
-  /// since it's replacing (not adding to) how the value is rendered. Digit extraction is done
-  /// manually (no snprintf/%f) so it works on AVR without needing printf float-support linked
-  /// in (-Wl,-u,vfprintf -lprintf_flt -lm), which isn't enabled by default.
+  /// Fixed N-decimal-place print formatting for a floating-point W. Digit extraction is
+  /// done manually (no snprintf/%f), so it works on AVR without float printf support linked.
   template <unsigned N, typename W>
   struct Decimals {
     using Type = typename W::Type;
@@ -562,18 +490,9 @@ namespace oneData {
     };
   };
 
-  /// @brief like Decimals<N,W> but N is a *runtime* value, read live from a pointer
-  /// to an external integral variable (nPtr) at print time — not pushed via a
-  /// setter/event. Lets one field's edited value (e.g. a "decimal places" field)
-  /// control how a *different* field renders, without needing a value-changed event
-  /// dispatch (OneMenu's EventDispatch only fires Enter/Exit/Focus/Blur — no
-  /// "value changed" event exists to push through). Same AVR-safe manual
-  /// digit-extraction as Decimals<N,W>, N substituted at runtime via *nPtr.
-  /// changed()/sync() additionally track *nPtr's own last-seen value, so a redraw
-  /// fires even when only the *formatting* source changed, not the wrapped value
-  /// itself (mirrors Watch<W>'s own get()!=watched idiom, widened to a second
-  /// tracked value). Requires W to already compose Watch<> (for Base::changed()/
-  /// sync() to exist) — same implicit precondition Decimals<N,W> already has.
+  /// Like Decimals<N,W> but N is read live from a pointer (nPtr) at print time.
+  /// changed()/sync() also track *nPtr so a redraw fires when only the format source
+  /// changes. Requires W to already compose Watch<>.
   template <auto nPtr, typename W>
   struct RuntimeDecimals {
     using Type = typename W::Type;
@@ -619,27 +538,10 @@ namespace oneData {
     };
   };
 
-  /// @brief printf-style print formatting for a wrapped Data-chain W (e.g. "%03d" for
-  /// leading-zero integers) — sibling of Decimals<N,W> in the same "numeric print
-  /// preference" family, for the case where a fixed decimal-place count isn't the
-  /// right tool and an arbitrary C format string is. fmt is a compile-time NTTP, not
-  /// a runtime argument: a string literal can't be a template parameter directly
-  /// (pre-C++20), so this uses the same pointer-to-pointer indirection StaticText<>/
-  /// MultiLangText::Of<> already use elsewhere in this file — declare a named
-  /// `static constexpr CText myFmt{"%03d"};` and pass `&myFmt`.
-  ///
-  /// Same idiom as Decimals/Translated: hijacks print()/printItem() instead of
-  /// forwarding to Base's, since it's replacing (not adding to) how the value is
-  /// rendered — Base would otherwise reach a Data<T>/DataFn/DataRef terminal that
-  /// prints the unformatted raw value too, double-printing.
-  ///
-  /// AVR CAVEAT: integer format specifiers (%d/%u/%x/%03d/...) work out of the box —
-  /// avr-libc's default (non-float) vfprintf handles them with no extra linking.
-  /// Floating-point specifiers (%f/%e/%g) additionally need
-  /// `-Wl,-u,vfprintf -lprintf_flt -lm` linked, which most AVR toolchain setups don't
-  /// enable by default (same reasoning Decimals<N,W> exists to sidestep entirely, via
-  /// manual digit extraction instead of snprintf/%f) — prefer Decimals<N,W> over
-  /// Printf<"%f",W> for AVR-safe fixed-decimal float printing.
+  /// Printf-style print formatting for a wrapped Data-chain W (e.g. "%03d"). fmt is a
+  /// compile-time NTTP passed via pointer-to-pointer indirection: declare a named
+  /// `static constexpr CText myFmt{"%03d"};` and pass `&myFmt`. On AVR, floating-point
+  /// specifiers need printf float support linked; prefer Decimals<N,W> otherwise.
   template <const char* const* fmt_ptr, typename W, unsigned sz = 16>
   struct Printf {
     using Type = typename W::Type;
@@ -666,31 +568,9 @@ namespace oneData {
     };
   };
 
-  /// @brief like Printf<fmt_ptr,W,sz> but fmt is a runtime const char*, fixed at
-  /// construction — for the case where the format string itself is a real runtime
-  /// value (e.g. supplied by the sketch author as a plain string literal argument),
-  /// not requiring the fmt_ptr pointer-to-pointer indirection Printf needs to work
-  /// around the "string literal isn't a legal NTTP" restriction. Same snprintf-
-  /// into-a-local-buffer rendering as Printf — same AVR caveat applies unchanged
-  /// (integer specifiers work with avr-libc's default vfprintf; float specifiers
-  /// need -Wl,-u,vfprintf -lprintf_flt -lm linked, prefer Decimals<N,W> instead for
-  /// AVR-safe float printing). Not live-reread like RuntimeDecimals<nPtr,W> — the
-  /// format string doesn't change while the program runs, only the wrapped value
-  /// does, so there's no separate "format source changed" case to track.
-  ///
-  /// The forwarding constructor below matters beyond this component alone: any
-  /// component composed *before* this one in an outer chain (e.g. `ItemDef<
-  /// AsLabel<Text>, ..., NumField<Range,AsField<RuntimePrintf<W>>>, AsUnit<Text>,
-  /// ...>`) reaches its own real constructor by threading remaining brace-init
-  /// arguments hand-to-hand down through every intermediate `using Base::Base;`
-  /// level — hapi::Chain's constructor inheritance is flat across the WHOLE
-  /// composed chain, not "peel one arg per level" on its own. A component with
-  /// its OWN extra runtime arg (this one's `fmt`) MUST consume exactly its own
-  /// arg and forward the rest via `Base{...}`, or anything declared *later* in
-  /// the outer chain (like that `AsUnit<Text>`) loses its own path to its real
-  /// constructor entirely — confirmed via a real compile error the first time
-  /// this used a fixed single-arg constructor instead (no forwarding path),
-  /// composing this through `NumFieldDef` for `fieldFormat.ino`'s port.
+  /// Like Printf<fmt_ptr,W,sz> but fmt is a runtime const char*, fixed at construction.
+  /// The constructor must consume its own `fmt` arg and forward the rest via `Base{...}`
+  /// so components declared later in the chain still reach their own constructors.
   template <typename W, unsigned sz = 16>
   struct RuntimePrintf {
     using Type = typename W::Type;
@@ -722,24 +602,8 @@ namespace oneData {
     };
   };
 
-  /// @brief swaps which physical key increases vs decreases a wrapped
-  /// range's value — wraps anything exposing up(step)/down(step) (e.g.
-  /// StaticNumRange<...>/NumRange<T>) and forwards to the OTHER one when
-  /// `Inverted` is true. Default `false` (not inverted) is a deliberate
-  /// choice, not an arbitrary one: it matches AM4's own real shipped
-  /// default (`config::invertFieldKeys = false`, confirmed against AM4's
-  /// actual source — `menuBase.cpp`'s `Menu::defaultOptions` — the
-  /// `config` struct's own constructor default of `true` is overridden
-  /// there) — natural direction, consistent with plain (non-edit-mode)
-  /// Up/Down semantics elsewhere in this codebase. AM4's own comment on
-  /// the equivalent code ("by default they are inverted.. now buttons and
-  /// joystick have to flip them") suggests the inverted case exists to
-  /// compensate for specific input devices (e.g. a rotary encoder whose
-  /// physical rotation sense doesn't match logical up/down), not as a
-  /// universal default. Compose `InvDir<Range,true>` in place of a plain
-  /// `Range` (e.g. `NumField<InvDir<StaticNumRange<...>,true>,
-  /// AsField<...>>`) to opt into the flipped direction for a specific
-  /// field.
+  /// Swaps which physical key increases vs decreases a wrapped range's value; wraps
+  /// anything exposing up(step)/down(step) and forwards to the other one when Inverted is true.
   template <typename W, bool Inverted = false>
   struct InvDir {
     // No outer `using Type = typename W::Type;` — W here is a Range-shaped
@@ -765,11 +629,7 @@ namespace oneData {
     };
   };
 
-  /// @brief erases set() from W — read-only view. Private-inherits W::Part<O> and re-exposes
-  /// only get()/print()/printItem(); set() (and any mutable access) is simply not brought back
-  /// into scope, so it's not just unused but genuinely inaccessible — anything above ReadOnly
-  /// that tries to call set() (e.g. StaticNumRange::up()/down(), which call set() internally)
-  /// fails to compile, catching "editable UI wired to a read-only value" at compile time.
+  /// Erases set() from W — read-only view; only get()/print()/printItem() remain accessible.
   template <typename W>
   struct ReadOnly {
     using Type = typename W::Type;
@@ -909,9 +769,7 @@ namespace oneData {
   };
 
   // DEFAULT (Default Value Injection Modifier) ---------------------------------
-  /// @brief wraps a data component, injecting a compile-time default value
-  /// Default<Data<int>, 0>
-  /// Watch<Default<Data<int>, 0>>  — composable freely
+  /// Wraps a data component, injecting a compile-time default value.
   template<typename W, auto val>
   struct Default {
     using Type = typename W::Type;
@@ -934,27 +792,9 @@ namespace oneData {
   };
 
   // BTREC (BT/GATT record tag) --------------------------------------------------
-  /// @brief tags a data component with a BT record id; same composition shape as
-  /// Watch/Default (wraps W, doesn't touch nav). Mirrors the value out through
-  /// Out::btWrite<Id>() — picked up by a matching oneOutput::BtOut<Ble,Id> if one is
-  /// composed into the Out chain, a no-op (see OutAPI::btWrite) otherwise, so an
-  /// untagged/unwired field costs nothing.
-  ///
-  /// If W wraps Watch (i.e. has changed()/sync()), printItem() only mirrors+syncs when
-  /// changed() — avoids pushing/notifying on every redraw. Without Watch it mirrors
-  /// unconditionally. print() (the const, non-nav path) always mirrors unconditionally,
-  /// since it can't call a mutating sync().
-  ///
-  /// BTRec<Watch<Default<Data<int>,0>>, 3>  — composable freely, same as Watch/Default.
-  /// Only matters to keep W reference-backed (DataRef/DataFn) instead of owned (Data<T>)
-  /// when BT runs its own independent nav alongside another nav over the same field tree
-  /// — two navs both owning the same Data<T> would duplicate it. If BT is the only
-  /// output/nav, owned Data<T> is fine too; the constraint is about multi-nav sharing,
-  /// not BTRec itself. See project_bt_menu_output memory for the fuller nav discussion.
-  ///
-  /// Inbound direction (peer write -> set()) is NOT wired yet — reading back
-  /// Ble::char_written(Id)/char_read(Id,...) into set() needs a text/binary parse-back
-  /// story (see setStr() used elsewhere) and is deferred; see project_bt_menu_output memory.
+  /// Tags a data component with a BT record id; mirrors the value out through
+  /// Out::btWrite<Id>(). If W wraps Watch<>, printItem() only mirrors+syncs when changed().
+  /// Inbound direction (peer write -> set()) is not wired yet.
   template<typename W, uint16_t Id>
   struct BTRec {
     using Type = typename W::Type;
