@@ -9,9 +9,20 @@
 //   6. find<Q>         — locate a tagged component in DataDef
 //   7. query<TagIs<Q>> — tag detection in DataDef::Types
 
-#include <cassert>
-#include <iostream>
-using namespace std;
+// avr-libc has no libstdc++, so no <cassert>/<iostream> -- same swap
+// HAPI's own examples/virt uses: streamFlow's Serial-backed cout, and a
+// minimal Serial-reporting assert() (avr-libc has no assert() either).
+#ifdef __AVR__
+  #include <streamFlow.h>
+  using namespace StreamFlow;
+  #define cout Serial
+  #define endl "\n"
+  #define assert(cond) do { if(!(cond)) { Serial.println(F("ASSERT FAIL: " #cond)); while(1){} } } while(0)
+#else
+  #include <cassert>
+  #include <iostream>
+  using namespace std;
+#endif
 
 #include <hapi/hapi.h>
 #include <oneData/oneData.h>
