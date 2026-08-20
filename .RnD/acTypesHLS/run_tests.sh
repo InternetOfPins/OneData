@@ -87,6 +87,23 @@ else
   cat "$WORK/biquad_native_build.log" "$WORK/biquad_native_run.log"
 fi
 
+# PID controller: a genuinely functional build, not another compatibility
+# check -- integral term reuses the accumulator shape, derivative term
+# reuses the FIR tap's delay shape. Both hand-derived sequences share one
+# static `pid` instance in pid_top.cpp, so each must run as its own fresh
+# process (argv-selected), not two calls within one binary.
+g++ -std=gnu++17 -I"$AC_TYPES_INCLUDE" -I"$HAPI_INC" -I"$ONEDATA_INC" \
+  "$HERE/tests/pid_native_test.cpp" \
+  "$HERE/hls/pid_top.cpp" \
+  -o "$WORK/pid_native_test" 2>"$WORK/pid_native_build.log"
+if [ $? -eq 0 ] && "$WORK/pid_native_test" >"$WORK/pid_native_run.log" 2>&1 \
+                && "$WORK/pid_native_test" impulse >>"$WORK/pid_native_run.log" 2>&1; then
+  pass "native PID controller correctness (constant-error step + impulse-disturbance response)"
+else
+  fail "native PID test (see build/run log below)"
+  cat "$WORK/pid_native_build.log" "$WORK/pid_native_run.log"
+fi
+
 # --- 2. Negative control: guard must reject Bambu's own bundled fork -------
 BUNDLED_EXTRACT="$WORK/bambu_extract"
 mkdir -p "$BUNDLED_EXTRACT"
@@ -124,6 +141,7 @@ for t in \
   "ac_complex_cmac:cmacTop:$HERE/hls/ac_complex_cmac_top.cpp" \
   "biquad:biquadTop:$HERE/hls/biquad_top.cpp" \
   "biquad_cascade2:biquadCascade2Top:$HERE/hls/biquad_cascade2_top.cpp" \
+  "pid:pidStep:$HERE/hls/pid_top.cpp" \
 ; do
   IFS=: read -r name topfn src <<< "$t"
   rc=$(run_bambu "$name" "$topfn" "$src" -I"$AC_TYPES_INCLUDE" -I"$HAPI_INC" -I"$ONEDATA_INC")

@@ -1,6 +1,63 @@
 # Handoff response: HLSLibs AC Datatypes × Bambu HLS (round 3: HAPI component shell)
 
-## Round 7: this whole directory moved from HAPI to OneData
+## Round 8: a genuinely functional build, not another compatibility check
+
+Every prior round built something to *prove a property* (does it
+synthesize, is it zero-overhead, does the shell generalize) — this round
+asked for something actually useful: a real PID controller,
+`u[n] = Kp*e[n] + Ki*sum(e) + Kd*(e[n]-e[n-1])`.
+
+**Built entirely from patterns already proven in this investigation, no
+new machinery needed:** the integral term reuses the accumulator shape
+from `ac_accumulator_top.cpp` (`IntegLogic` reads/updates a
+`Data<Accum>`); the derivative term reuses the FIR tap's delay-register
+shape (`DerivLogic` reads-old/updates-new a `Data<Sample>`, same as
+`TapLogic`); both coexist in one flat mono_block chain exactly like
+`biquad_top.cpp`'s feedforward/feedback split — two independently-named
+methods (`integrate()`/`differentiate()`), ordinary C++ inheritance
+routing each call past whichever component doesn't define it, no
+HAPI-level routing required. `Kp=1.0(256)`, `Ki=0.25(64)`, `Kd=0.5(128)`
+— same exact-power-of-two-coefficient, raw-Q8.8-bit-pattern-via-`set_slc`
+approach as the biquad, for the same reason (avoids the `static const`
+double-constructor lazy-init-guard trap found in that round).
+
+**Verified as a real controller, not just a compiling program** — two
+hand-derived sequences, both matching exactly, demonstrating genuine PID
+dynamics rather than just "it ran without crashing":
+- Constant error `e=1` held for 5 steps: `448 384 448 512 576` (raw
+  Q8.8) — P stays flat, I grows every step, D is zero after the first
+  step since the error never changes again.
+- Impulse disturbance (`e=1` then `0,0,0,0`): `448 -64 64 64 64` — the
+  P+D spike on the impulse itself, a D-term *undershoot* when the error
+  vanishes (correctly negative, since error decreased), settling to the
+  I term's permanent memory of the disturbance (`0.25` forever after) —
+  textbook PID step/impulse response, not a coincidence.
+
+**Bambu**: clean, zero warnings, real RTL. `pidStep`: FF=32, area=3841,
+0 DSPs, control steps=4, `ARRAY_1D_STD_DISTRAM_NN_SDS` (lightweight
+distributed RAM) — same cheap resource category as FIR/biquad/
+accumulator, not the complex-mac's BRAM anomaly.
+
+**Files:** `hls/pid_top.cpp`, `tests/pid_native_test.cpp` (argv-selected
+mode, since both hand-derived sequences share one static `pid` instance
+— each must run as its own fresh process, not two calls in one binary).
+`run_tests.sh` extended, now 18/19 checks (18 pass/fail plus the
+round-6 informational step) passing end-to-end.
+
+**Uncommitted** — `pid_top.cpp`/`pid_native_test.cpp` are new files in
+the gitignored `.RnD` tree (need a force-add like the rest of this
+directory got); `run_tests.sh`'s extension is a modification to an
+already-tracked file. No commit made without explicit instruction, same
+pattern as every prior round.
+
+**Natural follow-ups, not started:** anti-windup (the integrator has no
+saturation limit — a real controller would clamp it to prevent
+"integral windup" during actuator saturation); a derivative low-pass
+filter (real PID implementations usually filter the D term, since raw
+sample-to-sample derivatives amplify noise); tying actual gains/scaling
+to a real physical system (e.g. azoreanFlow's reflow oven thermal
+response) rather than the clean powers-of-two chosen here purely for
+hand-verification.
 
 Physically relocated: `HAPI/.RnD/acTypesHLS/` → `OneData/.RnD/acTypesHLS/`
 (this file's own current location), directly following round 6's
