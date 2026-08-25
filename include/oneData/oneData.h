@@ -51,7 +51,7 @@ namespace oneData {
     using Base = O;
     using Base::Base;
 
-    static constexpr bool changed() noexcept { return false; }
+    [[nodiscard]] static constexpr bool changed() noexcept { return false; }
     static constexpr void sync() noexcept {}
     template<typename Out> static constexpr void print(Out&) noexcept {}
     template<typename Out,typename Ctx> static constexpr void printItem(Out&,Ctx&) noexcept {}
@@ -97,7 +97,7 @@ namespace oneData {
       using Base::Base;
       using Type = decltype(_value);
 
-      static constexpr Type get() noexcept { return _value; }
+      [[nodiscard]] static constexpr Type get() noexcept { return _value; }
 
       template<typename Out>
       void print(Out& out) const noexcept { out.put(get()); Base::print(out); }
@@ -124,7 +124,7 @@ namespace oneData {
       template<typename Out,typename Ctx>
       void printItem(Out& out,Ctx& ctx) noexcept { out.put(get()); Base::printItem(out,ctx); }
 
-      static constexpr Type get() noexcept { return *text_ptr; }
+      [[nodiscard]] static constexpr Type get() noexcept { return *text_ptr; }
     };
   };
 
@@ -149,7 +149,7 @@ namespace oneData {
         using Type = const char*;
         using Base::Base;
 
-        static const char* get() noexcept { return texts[current]; }
+        [[nodiscard]] static const char* get() noexcept { return texts[current]; }
 
         template<typename Out>
         void print(Out& out) const noexcept { out.put(get()); Base::print(out); }
@@ -162,7 +162,7 @@ namespace oneData {
   /// Compile-time language table, id-indexed: table[lang][id]. Zero RAM, zero runtime cost.
   template<const char* const* const* table, int nLangs>
   struct FlashLangSrc {
-    static const char* text(int id, uint8_t lang) noexcept {
+    [[nodiscard]] static const char* text(int id, uint8_t lang) noexcept {
       return table[lang < nLangs ? lang : 0][id];
     }
   };
@@ -178,7 +178,7 @@ namespace oneData {
       using Type = const char*;
       using Base::Base;
 
-      static const char* get() noexcept { return Src::text(id, MultiLangText::current); }
+      [[nodiscard]] static const char* get() noexcept { return Src::text(id, MultiLangText::current); }
 
       template<typename Out>
       void print(Out& out) const noexcept { out.put(get()); Base::print(out); }
@@ -207,7 +207,7 @@ namespace oneData {
       template <typename... OO>
       constexpr Part(OO&&... oo) noexcept : Base{std::forward<OO>(oo)...} {}
 
-      const std::decay_t<Type>& get() const noexcept { return data; }
+      [[nodiscard]] const std::decay_t<Type>& get() const noexcept { return data; }
 
       template <typename V>
       void set(V&& v) noexcept { data = std::forward<V>(v); }
@@ -235,8 +235,8 @@ namespace oneData {
 
       char data[N]{};
 
-      const char* get() const noexcept { return data; }
-      char*       get()       noexcept { return data; }
+      [[nodiscard]] const char* get() const noexcept { return data; }
+      [[nodiscard]] char*       get()       noexcept { return data; }
 
       void set(const char* s) noexcept {
         strncpy(data, s, N - 1);
@@ -270,7 +270,7 @@ namespace oneData {
       using Type = std::remove_pointer_t<decltype(address)>;
       using Base::Base;
 
-      static auto& get() noexcept {
+      [[nodiscard]] static auto& get() noexcept {
         if constexpr (std::is_same_v<std::remove_cv_t<Type>, char>) {
           return address;
         } else {
@@ -302,7 +302,7 @@ namespace oneData {
       using Type = decltype(Src::get());
       using Base::Base;
 
-      static Type get() noexcept { return Src::get(); }
+      [[nodiscard]] static Type get() noexcept { return Src::get(); }
       static void set(Type v) noexcept { Src::set(v); }
 
       template<typename Out>
@@ -340,7 +340,7 @@ namespace oneData {
 
       std::remove_reference_t<Type> watched{};
 
-      constexpr bool changed() const noexcept { return get() != watched; }
+      [[nodiscard]] constexpr bool changed() const noexcept { return get() != watched; }
       void sync() noexcept { watched = get(); }
     };
   };
@@ -375,7 +375,7 @@ namespace oneData {
       template<typename V>
       void set(V&& v) noexcept { Base::set(std::forward<V>(v)); m_dirty=true; }
 
-      constexpr bool changed() const noexcept { return m_dirty; }
+      [[nodiscard]] constexpr bool changed() const noexcept { return m_dirty; }
       void sync() noexcept { m_dirty=false; }
     };
   };
@@ -392,7 +392,7 @@ namespace oneData {
       using Type = decltype(Policy::toDisplay(std::declval<typename Base::Type>()));
       using Base::Base;
 
-      Type get() const noexcept { return Policy::toDisplay(Base::get()); }
+      [[nodiscard]] Type get() const noexcept { return Policy::toDisplay(Base::get()); }
       void set(Type v) noexcept { Base::set(Policy::toRaw(v)); }
 
       // NOTE: deliberately does NOT forward to Base::print()/printItem() — Base
@@ -420,7 +420,7 @@ namespace oneData {
         using Type = decltype(getFn(std::declval<typename Base::Type>()));
         using Base::Base;
 
-        Type get() const noexcept { return getFn(Base::get()); }
+        [[nodiscard]] Type get() const noexcept { return getFn(Base::get()); }
         void set(Type v) noexcept { Base::set(setFn(v)); }
 
         // NOTE: deliberately does NOT forward to Base::print()/printItem() — same
@@ -506,7 +506,7 @@ namespace oneData {
 
       std::remove_reference_t<decltype(*nPtr)> lastN{*nPtr};
 
-      constexpr bool changed() const noexcept { return Base::changed() || *nPtr != lastN; }
+      [[nodiscard]] constexpr bool changed() const noexcept { return Base::changed() || *nPtr != lastN; }
       void sync() noexcept { Base::sync(); lastN = *nPtr; }
 
       template<typename Out>
@@ -651,25 +651,25 @@ namespace oneData {
   template<auto _low, auto _high, bool _wraps=false>
   struct StaticRange {
     template<typename T>
-    static constexpr T low() noexcept { return static_cast<T>(_low); }
+    [[nodiscard]] static constexpr T low() noexcept { return static_cast<T>(_low); }
     template<typename T>
-    static constexpr T high() noexcept { return static_cast<T>(_high); }
+    [[nodiscard]] static constexpr T high() noexcept { return static_cast<T>(_high); }
     static constexpr bool wraps() noexcept { return _wraps; }
 
     template<typename T>
-    static constexpr bool valid(T v) noexcept {
+    [[nodiscard]] static constexpr bool valid(T v) noexcept {
       return v >= low<T>() && v <= high<T>();
     }
     template<typename T>
-    static constexpr T clamp(T v) noexcept {
+    [[nodiscard]] static constexpr T clamp(T v) noexcept {
       return v < low<T>() ? low<T>() : v > high<T>() ? high<T>() : v;
     }
     template<typename T>
-    static constexpr T stepUp(T o, T s) noexcept {
+    [[nodiscard]] static constexpr T stepUp(T o, T s) noexcept {
       return high<T>() - o >= s ? o + s : _wraps ? low<T>() : high<T>();
     }
     template<typename T>
-    static constexpr T stepDown(T o, T s) noexcept {
+    [[nodiscard]] static constexpr T stepDown(T o, T s) noexcept {
       return o - low<T>() >= s ? o - s : _wraps ? high<T>() : low<T>();
     }
   };
@@ -694,14 +694,14 @@ namespace oneData {
       constexpr Part(NRP low, NRP high, bool w, OO&&... oo) noexcept
           : Base{std::forward<OO>(oo)...}, m_low{low}, m_high{high}, wraps{w} {}
 
-      constexpr bool valid(NRP v) const noexcept { return v >= m_low && v <= m_high; }
-      constexpr NRP clamp(NRP v) const noexcept {
+      [[nodiscard]] constexpr bool valid(NRP v) const noexcept { return v >= m_low && v <= m_high; }
+      [[nodiscard]] constexpr NRP clamp(NRP v) const noexcept {
         return v < m_low ? m_low : v > m_high ? m_high : v;
       }
-      constexpr NRP stepUp(NRP o, NRP s) noexcept {
+      [[nodiscard]] constexpr NRP stepUp(NRP o, NRP s) noexcept {
         return m_high - o >= s ? o + s : wraps ? m_low : m_high;
       }
-      constexpr NRP stepDown(NRP s, NRP o) noexcept {
+      [[nodiscard]] constexpr NRP stepDown(NRP s, NRP o) noexcept {
         return o - m_low >= s ? o - s : wraps ? m_high : m_low;
       }
 
@@ -734,18 +734,18 @@ namespace oneData {
       using Base::get;
       using Base::set;
 
-      static constexpr bool valid(Type v) noexcept {
+      [[nodiscard]] static constexpr bool valid(Type v) noexcept {
         return RangeDesc::template valid<Type>(v);
       }
-      static constexpr Type clamp(Type v) noexcept {
+      [[nodiscard]] static constexpr Type clamp(Type v) noexcept {
         return RangeDesc::template clamp<Type>(v);
       }
       // Plain value accessors (no formatting/rendering concern — OneData
       // must never depend on OneMenu, see the dependency map memory) so a
       // higher layer (oneMenu::NumField) can expose the field's own range
       // for real client-facing rendering (e.g. a web slider's min/max).
-      static constexpr Type low() noexcept { return RangeDesc::template low<Type>(); }
-      static constexpr Type high() noexcept { return RangeDesc::template high<Type>(); }
+      [[nodiscard]] static constexpr Type low() noexcept { return RangeDesc::template low<Type>(); }
+      [[nodiscard]] static constexpr Type high() noexcept { return RangeDesc::template high<Type>(); }
 
       void up(Type step=1) noexcept {
         set(RangeDesc::template stepUp<Type>(get(), step));
