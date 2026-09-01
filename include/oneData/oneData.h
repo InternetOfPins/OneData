@@ -200,11 +200,23 @@ namespace oneData {
 
       Type data{};
 
-      template <typename V, typename... OO>
+      // The two forwarding ctors below are SFINAE-guarded so that a single
+      // argument which is (a copy/move of) this Part -- or a type derived
+      // from it, e.g. Fir<> -- can NOT select them: the implicitly declared
+      // copy/move ctor must win instead. Without the guard, MSVC's overload
+      // resolution picks Part(OO&&...) with OO={Fir&} for Fir(const Fir&),
+      // recurses one Chain::Part level down per `using Base::Base`, and
+      // C4717s into a runtime stack overflow (GCC/Clang pick the copy ctor
+      // and never hit it). See OneHLS test/staticList_test.cpp.
+      template <typename V, typename... OO,
+                std::enable_if_t<sizeof...(OO) != 0 ||
+                  !std::is_base_of<Part, std::decay_t<V>>::value, int> = 0>
       constexpr Part(V v, OO&&... oo) noexcept
           : Base{std::forward<OO>(oo)...}, data(static_cast<std::decay_t<Type>>(v)) {}
 
-      template <typename... OO>
+      template <typename... OO,
+                std::enable_if_t<!(sizeof...(OO) == 1 &&
+                  (std::is_base_of<Part, std::decay_t<OO>>::value && ...)), int> = 0>
       constexpr Part(OO&&... oo) noexcept : Base{std::forward<OO>(oo)...} {}
 
       [[nodiscard]] const std::decay_t<Type>& get() const noexcept { return data; }
