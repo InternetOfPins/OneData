@@ -208,15 +208,20 @@ namespace oneData {
       // recurses one Chain::Part level down per `using Base::Base`, and
       // C4717s into a runtime stack overflow (GCC/Clang pick the copy ctor
       // and never hit it). See OneHLS test/staticList_test.cpp.
+      // (No fold expression here -- MSVC /std:c++17 chokes on a fold inside
+      // a template default-argument, C2059.)
+      template <typename...> struct SelfArg : std::false_type {};
+      template <typename A> struct SelfArg<A>
+          : std::is_base_of<Part, std::decay_t<A>> {};
+
       template <typename V, typename... OO,
                 std::enable_if_t<sizeof...(OO) != 0 ||
-                  !std::is_base_of<Part, std::decay_t<V>>::value, int> = 0>
+                  !SelfArg<V>::value, int> = 0>
       constexpr Part(V v, OO&&... oo) noexcept
           : Base{std::forward<OO>(oo)...}, data(static_cast<std::decay_t<Type>>(v)) {}
 
       template <typename... OO,
-                std::enable_if_t<!(sizeof...(OO) == 1 &&
-                  (std::is_base_of<Part, std::decay_t<OO>>::value && ...)), int> = 0>
+                std::enable_if_t<!SelfArg<OO...>::value, int> = 0>
       constexpr Part(OO&&... oo) noexcept : Base{std::forward<OO>(oo)...} {}
 
       [[nodiscard]] const std::decay_t<Type>& get() const noexcept { return data; }
