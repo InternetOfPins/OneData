@@ -864,9 +864,9 @@ namespace oneData {
 // Hidden's own inert terminal sentinel, see its definition above) — same
 // Chain<...>::Part<O>-wrapping shape as oneMenu::MenuPrinter, opaque to
 // hapi::query/Traverse without an Expand entry. No confirmed live trigger today.
-// Queries and selection (Filter/Map/Partition) look inside.
+// Queries and selection (Filter/Map/Partition) look inside, and the rules() of what it wraps run as if placed directly.
 namespace hapi {
   template<typename... II>
   struct Expand<oneData::Hidden<II...>>
-    : Expansion<Chain<II...,typename oneData::Hidden<II...>::End>,true,true> {};
+    : Expansion<Chain<II...,typename oneData::Hidden<II...>::End>,true,true,true> {};
 }
