@@ -863,11 +863,10 @@ namespace oneData {
 // Hidden<II...>::Part<I> is built from hapi::Chain<II...,End>::Part<I> (End is
 // Hidden's own inert terminal sentinel, see its definition above) — same
 // Chain<...>::Part<O>-wrapping shape as oneMenu::MenuPrinter, opaque to
-// hapi::query/Traverse without this specialization. No confirmed live trigger today.
+// hapi::query/Traverse without an Expand entry. No confirmed live trigger today.
+// Queries and selection (Filter/Map/Partition) look inside.
 namespace hapi {
-  template<typename Op, typename... II>
-  struct Traverse<Op, oneData::Hidden<II...>> {
-    using Beta = typename Op::template ApplyPack<typename Traverse<Op, II>::Beta...,
-                                                   typename Traverse<Op, typename oneData::Hidden<II...>::End>::Beta>;
-  };
+  template<typename... II>
+  struct Expand<oneData::Hidden<II...>>
+    : Expansion<Chain<II...,typename oneData::Hidden<II...>::End>,true,true> {};
 }
