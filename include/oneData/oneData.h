@@ -715,6 +715,11 @@ namespace oneData {
       [[nodiscard]] constexpr NRP clamp(NRP v) const noexcept {
         return v < m_low ? m_low : v > m_high ? m_high : v;
       }
+      // Plain value accessors, the runtime counterpart of StaticNumRange's low()/high(): a
+      // higher layer (oneMenu::NumField) reads the range through these instead of reaching
+      // into m_low/m_high, so both range kinds present the same interface.
+      [[nodiscard]] constexpr NRP low() const noexcept { return m_low; }
+      [[nodiscard]] constexpr NRP high() const noexcept { return m_high; }
       [[nodiscard]] constexpr NRP stepUp(NRP o, NRP s) noexcept {
         return m_high - o >= s ? o + s : wraps ? m_low : m_high;
       }

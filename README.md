@@ -204,6 +204,8 @@ Part(NRP low, NRP high, bool wraps, ...rest);
 
 bool valid(NRP v) const noexcept;
 NRP  clamp(NRP v) const noexcept;
+NRP  low () const noexcept;   // the bounds, same interface as StaticNumRange's low()/high()
+NRP  high() const noexcept;
 void up  (NRP step = 1) noexcept;
 void down(NRP step = 1) noexcept;
 ```
@@ -212,7 +214,7 @@ void down(NRP step = 1) noexcept;
 
 ### StaticNumRange\<N, low, high, wraps = false\>
 
-Compile-time variant. No stored state; `up()`/`down()` clamp via `constexpr` expressions.
+Compile-time variant. No stored state; `up()`/`down()` clamp via `constexpr` expressions. Also exposes the range through `low()`/`high()` (static).
 
 ### Default\<T, defaultValue\>
 

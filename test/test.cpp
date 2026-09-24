@@ -133,6 +133,20 @@ void test_num_range() {
   r.down();
   assert(r.get() == 4);
   cout << "NumRange<int>: ok" << endl;
+
+  // low()/high(): plain accessors for the runtime bounds (same interface as StaticNumRange's),
+  // what oneMenu::NumField reads to expose a field's range
+  static_assert(std::is_same<decltype(r.low()), int>::value && std::is_same<decltype(r.high()), int>::value,
+    "NumRange<int>::low()/high() return the value type");
+  assert(r.low() == 0 && r.high() == 10);
+  DataDef<NumRange<int>, Int> r2{-5, 50, true, 0};
+  assert(r2.low() == -5 && r2.high() == 50);   // each instance carries its own bounds
+  assert(r.low() == 0 && r.high() == 10);       // ...and the first one is unaffected
+  DataDef<NumRange<double>, Data<double>> d{-1.5, 2.5, false, 0.0};
+  assert(d.low() == -1.5 && d.high() == 2.5);
+  const auto& cr = r;                            // callable on a const range
+  assert(cr.low() == 0 && cr.high() == 10);
+  cout << "NumRange low()/high(): ok" << endl;
 }
 
 void test_default_value() {
