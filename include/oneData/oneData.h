@@ -357,8 +357,8 @@ namespace oneData {
 
       std::remove_reference_t<Type> watched{};
 
-      [[nodiscard]] constexpr bool changed() const noexcept { return get() != watched; }
-      void sync() noexcept { watched = get(); }
+      [[nodiscard]] constexpr bool changed() const noexcept { return get() != watched || Base::changed(); }
+      void sync() noexcept { Base::sync(); watched = get(); }
     };
   };
 
@@ -392,8 +392,8 @@ namespace oneData {
       template<typename V>
       void set(V&& v) noexcept { Base::set(std::forward<V>(v)); m_dirty=true; }
 
-      [[nodiscard]] constexpr bool changed() const noexcept { return m_dirty; }
-      void sync() noexcept { m_dirty=false; }
+      [[nodiscard]] constexpr bool changed() const noexcept { return m_dirty || Base::changed(); }
+      void sync() noexcept { Base::sync(); m_dirty=false; }
     };
   };
 
