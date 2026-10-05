@@ -1,6 +1,6 @@
 {
   "name": "OneData",
-  "version": "0.1.21",
+  "version": "0.1.22",
   "description": "HAPI data components",
   "keywords": "components, data",
   "build": {

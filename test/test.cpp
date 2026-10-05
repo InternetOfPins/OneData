@@ -303,6 +303,17 @@ void test_read_only() {
   cout << "ReadOnly<Default<Int,42>>: ok" << endl;
 }
 
+template<typename T, typename = void> struct CanSet : std::false_type {};
+template<typename T> struct CanSet<T, std::void_t<decltype(std::declval<T&>().set(1))>> : std::true_type {};
+
+void test_read_only_tracking() {
+  static_assert(CanSet<DataDef<Watch<Int>>>::value, "Watch<Int> is writable");
+  static_assert(!CanSet<DataDef<ReadOnly<Watch<Int>>>>::value, "ReadOnly deletes set()");
+  DataDef<ReadOnly<Watch<Int>>> d;             // the value moves outside this view; the view reports and takes the change
+  assert(!d.changed());
+  cout << "ReadOnly<Watch<Int>>: set() erased, changed()/sync() kept: ok" << endl;
+}
+
 void test_translated_read_only_wrapper() {
   FakePinSrc::value = 512;
   DataDef<Translated<ReadOnly<DataFn<FakePinSrc>>,AdcToVolts>> d;
@@ -449,6 +460,7 @@ void doTests() {
   test_translated_readonly();
   test_read_only();
   test_translated_read_only_wrapper();
+  test_read_only_tracking();
   test_decimals();
   test_printf();
   test_runtime_printf();

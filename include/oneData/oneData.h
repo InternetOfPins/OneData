@@ -674,21 +674,17 @@ namespace oneData {
     };
   };
 
-  /// Erases set() from W — read-only view; only get()/print()/printItem() remain accessible.
+  /// Erases set() from W: it is deleted, so a read-only view cannot be written through, and everything else of W (get(), print(),
+  /// changed(), sync(), ...) stays. Public inheritance, so an item that composes it (an ItemDef) reaches the base items' API.
   template <typename W>
   struct ReadOnly {
     using Type = typename W::Type;
     template <typename O>
-    struct Part : private W::template Part<O> {
+    struct Part : W::template Part<O> {
       using Base = typename W::template Part<O>;
-    public:
       using Base::Base;
       using Type = typename Base::Type;
-      using Base::get;
-      template<typename Out>
-      void print(Out& out) const noexcept { Base::print(out); }
-      template<typename Out,typename Ctx>
-      void printItem(Out& out,Ctx& ctx) noexcept { Base::printItem(out,ctx); }
+      template <typename V> void set(V&&) = delete;
     };
   };
 
