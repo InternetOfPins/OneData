@@ -397,6 +397,34 @@ namespace oneData {
     };
   };
 
+  /// @brief Fires fn(v) on every set(); v is re-read via get() after Base::set() (it may be clamped or transformed).
+  /// Compose before the storage, e.g. DataDef<OnChange<fn>, Int>.
+  template<auto fn>
+  struct OnChange {
+    template<typename I>
+    struct Part:I {
+      using Base=I;
+      using Base::Base;
+      using Base::get;
+      using Type=typename Base::Type;
+      void set(Type v) {Base::set(v); fn(Base::get());}
+    };
+  };
+
+  /// @brief Fires fn(v) on sync() when changed() is true, before Base::sync() takes the new copy.
+  /// Compose before a change tracker, e.g. DataDef<OnSync<fn>, Watch<Int>>.
+  template<auto fn>
+  struct OnSync {
+    template<typename I>
+    struct Part:I {
+      using Base=I;
+      using Base::Base;
+      using Base::get;
+      using Base::sync;  // same reason as Watch<>'s identical line
+      void sync() noexcept { if(Base::changed()) fn(Base::get()); Base::sync(); }
+    };
+  };
+
   /// Bidirectional value conversion between raw storage W and a displayed/edited Type.
   /// Policy requires `static Display toDisplay(Raw)`; `static Raw toRaw(Display)` is only
   /// needed if the field is edited (set() called).
@@ -646,21 +674,17 @@ namespace oneData {
     };
   };
 
-  /// Erases set() from W — read-only view; only get()/print()/printItem() remain accessible.
+  /// Erases set() from W: it is deleted, so a read-only view cannot be written through, and everything else of W (get(), print(),
+  /// changed(), sync(), ...) stays. Public inheritance, so an item that composes it (an ItemDef) reaches the base items' API.
   template <typename W>
   struct ReadOnly {
     using Type = typename W::Type;
     template <typename O>
-    struct Part : private W::template Part<O> {
+    struct Part : W::template Part<O> {
       using Base = typename W::template Part<O>;
-    public:
       using Base::Base;
       using Type = typename Base::Type;
-      using Base::get;
-      template<typename Out>
-      void print(Out& out) const noexcept { Base::print(out); }
-      template<typename Out,typename Ctx>
-      void printItem(Out& out,Ctx& ctx) noexcept { Base::printItem(out,ctx); }
+      template <typename V> void set(V&&) = delete;
     };
   };
 

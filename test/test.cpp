@@ -6,6 +6,8 @@
  *   Data<T>           — owned RAM storage, get/set
  *   StaticData        — compile-time constant
  *   Watch             — change tracking (changed/sync)
+ *   OnChange          — callback on every set()
+ *   OnSync            — callback on sync() when changed(), chains through Base
  *   StaticNumRange    — compile-time range up/down/clamp
  *   NumRange          — runtime range up/down
  *   Default           — default value injection
@@ -73,6 +75,66 @@ void test_watch() {
   d.set(5);
   assert(d.changed());
   cout << "Watch<Int>: ok" << endl;
+}
+
+static int cbChange = 0, cbChangeLast = -1, cbA = 0, cbALast = -1, cbB = 0;
+static void onChangeFn(int v) { ++cbChange; cbChangeLast = v; }
+static void onSyncA(int v)    { ++cbA; cbALast = v; }
+static void onSyncB(int)      { ++cbB; }
+
+void test_on_change() {
+  cbChange = 0;
+  DataDef<OnChange<onChangeFn>, Int> d;
+  d.set(7);
+  assert(cbChange == 1 && cbChangeLast == 7 && d.get() == 7);
+  d.set(7);
+  assert(cbChange == 2);        // every set(), equal or not
+  DataDef<OnChange<onChangeFn>, Watch<Int>> w;
+  w.set(3);
+  assert(cbChange == 3 && cbChangeLast == 3);
+  assert(w.changed());          // the tracker below still sees the set
+  w.sync();
+  assert(!w.changed());
+  cout << "OnChange<fn>: ok" << endl;
+}
+
+void test_on_sync() {
+  cbA = cbB = 0;
+  DataDef<OnSync<onSyncA>, Watch<Int>> d;
+  d.sync();
+  assert(cbA == 0);             // nothing changed
+  d.set(10);
+  assert(cbA == 0);             // not at set()
+  d.sync();
+  assert(cbA == 1 && cbALast == 10);
+  assert(!d.changed());         // Watch took its copy after fn
+  d.sync();
+  assert(cbA == 1);             // once per change
+  d.set(10);
+  d.sync();
+  assert(cbA == 1);             // equal set: no change
+  d.set(5);
+  d.sync();
+  assert(cbA == 2 && cbALast == 5);
+
+  // two in a row: each fires once, then the Watch below has its new copy
+  DataDef<OnSync<onSyncA>, OnSync<onSyncB>, Watch<Int>> two;
+  two.set(3);
+  two.sync();
+  assert(cbA == 3 && cbB == 1 && cbALast == 3);
+  two.sync();
+  assert(cbA == 3 && cbB == 1);
+
+  // over Dirty: a set() counts even when equal, and it starts dirty
+  DataDef<OnSync<onSyncB>, Dirty<Int>> dirty;
+  dirty.sync();
+  assert(cbB == 2);
+  dirty.sync();
+  assert(cbB == 2);
+  dirty.set(0);
+  dirty.sync();
+  assert(cbB == 3);
+  cout << "OnSync<fn>: ok" << endl;
 }
 
 void test_static_num_range() {
@@ -241,6 +303,17 @@ void test_read_only() {
   cout << "ReadOnly<Default<Int,42>>: ok" << endl;
 }
 
+template<typename T, typename = void> struct CanSet : std::false_type {};
+template<typename T> struct CanSet<T, std::void_t<decltype(std::declval<T&>().set(1))>> : std::true_type {};
+
+void test_read_only_tracking() {
+  static_assert(CanSet<DataDef<Watch<Int>>>::value, "Watch<Int> is writable");
+  static_assert(!CanSet<DataDef<ReadOnly<Watch<Int>>>>::value, "ReadOnly deletes set()");
+  DataDef<ReadOnly<Watch<Int>>> d;             // the value moves outside this view; the view reports and takes the change
+  assert(!d.changed());
+  cout << "ReadOnly<Watch<Int>>: set() erased, changed()/sync() kept: ok" << endl;
+}
+
 void test_translated_read_only_wrapper() {
   FakePinSrc::value = 512;
   DataDef<Translated<ReadOnly<DataFn<FakePinSrc>>,AdcToVolts>> d;
@@ -373,6 +446,8 @@ void doTests() {
   test_data_bool();
   test_static_val();
   test_watch();
+  test_on_change();
+  test_on_sync();
   test_static_num_range();
   test_num_range();
   test_inv_dir();
@@ -385,6 +460,7 @@ void doTests() {
   test_translated_readonly();
   test_read_only();
   test_translated_read_only_wrapper();
+  test_read_only_tracking();
   test_decimals();
   test_printf();
   test_runtime_printf();
