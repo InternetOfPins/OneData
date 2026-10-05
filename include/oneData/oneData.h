@@ -421,7 +421,6 @@ namespace oneData {
       using Base::Base;
       using Base::get;
       using Base::sync;  // same reason as Watch<>'s identical line
-      using Type=typename Base::Type;
       void sync() noexcept { if(Base::changed()) fn(Base::get()); Base::sync(); }
     };
   };
