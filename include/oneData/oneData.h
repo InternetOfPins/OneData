@@ -397,6 +397,35 @@ namespace oneData {
     };
   };
 
+  /// @brief Fires fn(v) on every set(); v is re-read via get() after Base::set() (it may be clamped or transformed).
+  /// Compose before the storage, e.g. DataDef<OnChange<fn>, Int>.
+  template<auto fn>
+  struct OnChange {
+    template<typename I>
+    struct Part:I {
+      using Base=I;
+      using Base::Base;
+      using Base::get;
+      using Type=typename Base::Type;
+      void set(Type v) {Base::set(v); fn(Base::get());}
+    };
+  };
+
+  /// @brief Fires fn(v) on sync() when changed() is true, before Base::sync() takes the new copy.
+  /// Compose before a change tracker, e.g. DataDef<OnSync<fn>, Watch<Int>>.
+  template<auto fn>
+  struct OnSync {
+    template<typename I>
+    struct Part:I {
+      using Base=I;
+      using Base::Base;
+      using Base::get;
+      using Base::sync;  // same reason as Watch<>'s identical line
+      using Type=typename Base::Type;
+      void sync() noexcept { if(Base::changed()) fn(Base::get()); Base::sync(); }
+    };
+  };
+
   /// Bidirectional value conversion between raw storage W and a displayed/edited Type.
   /// Policy requires `static Display toDisplay(Raw)`; `static Raw toRaw(Display)` is only
   /// needed if the field is edited (set() called).
